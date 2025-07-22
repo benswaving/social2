@@ -173,9 +173,9 @@ function App() {
       
       // Poll for results with multiple attempts - content-type aware
       const getMaxAttempts = (contentTypes) => {
-        if (contentTypes.includes('video')) return 40; // 2 minutes for video
-        if (contentTypes.includes('image')) return 20; // 1 minute for images
-        return 10; // 30 seconds for text only
+        if (contentTypes.includes('video')) return 60; // 3 minutes for video
+        if (contentTypes.includes('image')) return 40; // 2 minutes for images  
+        return 30; // 1.5 minutes for text only (async job needs time)
       };
       
       const maxAttempts = getMaxAttempts(selectedFormats);
@@ -205,8 +205,8 @@ function App() {
         }
       };
       
-      // Start polling after 2 seconds
-      setTimeout(() => pollForContent(response.project_id), 2000);
+      // Start polling after 5 seconds (give async job time to start)
+      setTimeout(() => pollForContent(response.project_id), 5000);
 
     } catch (error) {
       console.error('Content generation error:', error);
@@ -545,6 +545,29 @@ function App() {
                             <p className="text-white leading-relaxed">{content.text_content}</p>
                             {content.hashtags && (
                               <p className="text-blue-400 text-sm font-medium">{content.hashtags}</p>
+                            )}
+                            {/* Display images if available */}
+                            {content.media_url && (
+                              <div className="mt-4">
+                                {(() => {
+                                  // Use backend URL directly as workaround for nginx proxy issues
+                                  const imageUrl = content.media_url.startsWith('/media/') 
+                                    ? `http://localhost:3088${content.media_url}` 
+                                    : content.media_url;
+                                  console.log('🖼️ Rendering image:', imageUrl);
+                                  return (
+                                    <img 
+                                      src={imageUrl}
+                                      alt={`Generated content for ${content.platform}`}
+                                      className="max-w-full h-auto rounded-lg border border-slate-600 shadow-lg"
+                                      onError={(e) => {
+                                        console.error('🖼️ Image failed to load:', imageUrl);
+                                        e.target.style.display = 'none';
+                                      }}
+                                    />
+                                  );
+                                })()}
+                              </div>
                             )}
                             <div className="flex items-center gap-4 text-xs text-slate-400">
                               <span>Created: {content.created_at ? new Date(content.created_at).toLocaleString() : 'N/A'}</span>
