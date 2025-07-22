@@ -1,5 +1,5 @@
 // API service for communicating with the backend
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3088/api';
 
 class ApiService {
   constructor() {
@@ -74,6 +74,8 @@ class ApiService {
 
   // Content generation methods
   async generateContent(contentData) {
+    console.log('Frontend sending data to backend:', contentData);
+    console.log('JSON stringified:', JSON.stringify(contentData));
     return this.request('/content/generate', {
       method: 'POST',
       body: JSON.stringify(contentData),

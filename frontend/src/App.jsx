@@ -145,13 +145,24 @@ function App() {
       }
     }
 
+    // Frontend validation
+    if (!topic || topic.trim().length < 10) {
+      setError('Please enter a topic/prompt of at least 10 characters');
+      return;
+    }
+    
+    if (!selectedPlatforms || selectedPlatforms.length === 0) {
+      setError('Please select at least one platform');
+      return;
+    }
+
     setIsGenerating(true);
     setError('');
     setSuccess('');
 
     try {
       const response = await apiService.generateContent({
-        prompt: topic,
+        prompt: topic.trim(),
         platforms: selectedPlatforms,
         content_types: selectedFormats,
         tone: tone || undefined,
@@ -160,15 +171,42 @@ function App() {
 
       setSuccess('Content generation started! Project ID: ' + response.project_id);
       
-      // Poll for results (in a real app, you'd use websockets or server-sent events)
-      setTimeout(async () => {
+      // Poll for results with multiple attempts - content-type aware
+      const getMaxAttempts = (contentTypes) => {
+        if (contentTypes.includes('video')) return 40; // 2 minutes for video
+        if (contentTypes.includes('image')) return 20; // 1 minute for images
+        return 10; // 30 seconds for text only
+      };
+      
+      const maxAttempts = getMaxAttempts(selectedFormats);
+      const pollForContent = async (projectId, attempt = 1, maxAttemptsOverride = maxAttempts) => {
         try {
-          const contentResponse = await apiService.getGeneratedContent(response.project_id);
-          setGeneratedContent(contentResponse);
+          console.log(`Polling attempt ${attempt}/${maxAttemptsOverride} for project ${projectId}`);
+          const contentResponse = await apiService.getGeneratedContent(projectId);
+          
+          if (contentResponse && contentResponse.length > 0) {
+            console.log('Content found!', contentResponse);
+            setGeneratedContent(contentResponse);
+            setSuccess('Content generated successfully!');
+          } else if (attempt < maxAttemptsOverride) {
+            console.log('No content yet, trying again in 3 seconds...');
+            setTimeout(() => pollForContent(projectId, attempt + 1, maxAttemptsOverride), 3000);
+          } else {
+            console.log('Max polling attempts reached, no content found');
+            setError('Content generation took too long. Please refresh and try again.');
+          }
         } catch (error) {
           console.error('Failed to fetch generated content:', error);
+          if (attempt < maxAttemptsOverride) {
+            setTimeout(() => pollForContent(projectId, attempt + 1, maxAttemptsOverride), 3000);
+          } else {
+            setError('Failed to retrieve generated content.');
+          }
         }
-      }, 3000);
+      };
+      
+      // Start polling after 2 seconds
+      setTimeout(() => pollForContent(response.project_id), 2000);
 
     } catch (error) {
       console.error('Content generation error:', error);
@@ -188,15 +226,36 @@ function App() {
           
           setSuccess('Content generation started! Project ID: ' + response.project_id);
           
-          // Poll for results
-          setTimeout(async () => {
+          // Poll for results with multiple attempts (retry case) - content-type aware
+          const maxAttemptsRetry = getMaxAttempts(selectedFormats);
+          const pollForContentRetry = async (projectId, attempt = 1, maxAttemptsOverride = maxAttemptsRetry) => {
             try {
-              const contentResponse = await apiService.getGeneratedContent(response.project_id);
-              setGeneratedContent(contentResponse);
+              console.log(`Retry polling attempt ${attempt}/${maxAttemptsOverride} for project ${projectId}`);
+              const contentResponse = await apiService.getGeneratedContent(projectId);
+              
+              if (contentResponse && contentResponse.length > 0) {
+                console.log('Content found on retry!', contentResponse);
+                setGeneratedContent(contentResponse);
+                setSuccess('Content generated successfully!');
+              } else if (attempt < maxAttemptsOverride) {
+                console.log('No content yet on retry, trying again in 3 seconds...');
+                setTimeout(() => pollForContentRetry(projectId, attempt + 1, maxAttemptsOverride), 3000);
+              } else {
+                console.log('Max retry polling attempts reached, no content found');
+                setError('Content generation took too long. Please refresh and try again.');
+              }
             } catch (error) {
-              console.error('Failed to fetch generated content:', error);
+              console.error('Failed to fetch generated content on retry:', error);
+              if (attempt < maxAttemptsOverride) {
+                setTimeout(() => pollForContentRetry(projectId, attempt + 1, maxAttemptsOverride), 3000);
+              } else {
+                setError('Failed to retrieve generated content.');
+              }
             }
-          }, 3000);
+          };
+          
+          // Start retry polling after 2 seconds
+          setTimeout(() => pollForContentRetry(response.project_id), 2000);
           
         } catch (retryError) {
           setError('Authentication failed. Please refresh the page.');
@@ -461,7 +520,7 @@ function App() {
             )}
 
             {/* Generated Content Display */}
-            {generatedContent && (
+            {generatedContent && Array.isArray(generatedContent) && generatedContent.length > 0 && (
               <Card className="bg-slate-800/50 border-slate-700">
                 <CardHeader>
                   <CardTitle className="text-white">Generated Content</CardTitle>
@@ -471,33 +530,33 @@ function App() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {generatedContent.generated_content?.map((content, index) => (
-                      <div key={index} className="p-4 bg-slate-700/30 rounded-lg">
-                        <div className="flex items-center gap-2 mb-3">
-                          <Badge className="bg-purple-600/20 text-purple-300">
-                            {content.platform}
-                          </Badge>
-                          <Badge variant="outline" className="border-slate-600 text-slate-300">
-                            {content.content_type}
-                          </Badge>
-                          <Badge variant="outline" className="border-green-600 text-green-300">
-                            {content.ai_model_used}
-                          </Badge>
-                        </div>
-                        <div className="space-y-3">
-                          <p className="text-white leading-relaxed">{content.generated_text}</p>
-                          {content.generated_hashtags && (
-                            <p className="text-blue-400 text-sm font-medium">{content.generated_hashtags}</p>
-                          )}
-                          <div className="flex items-center gap-4 text-xs text-slate-400">
-                            <span>Tone: {content.tone_of_voice}</span>
-                            {content.quality_score && (
-                              <span>Quality: {Math.round(content.quality_score * 100)}%</span>
+                    {Array.isArray(generatedContent) && generatedContent.length > 0 ? (
+                      generatedContent.map((content, index) => (
+                        <div key={index} className="p-4 bg-slate-700/30 rounded-lg">
+                          <div className="flex items-center gap-2 mb-3">
+                            <Badge className="bg-purple-600/20 text-purple-300">
+                              {content.platform}
+                            </Badge>
+                            <Badge variant="outline" className="border-slate-600 text-slate-300">
+                              {content.content_type}
+                            </Badge>
+                          </div>
+                          <div className="space-y-3">
+                            <p className="text-white leading-relaxed">{content.text_content}</p>
+                            {content.hashtags && (
+                              <p className="text-blue-400 text-sm font-medium">{content.hashtags}</p>
                             )}
+                            <div className="flex items-center gap-4 text-xs text-slate-400">
+                              <span>Created: {content.created_at ? new Date(content.created_at).toLocaleString() : 'N/A'}</span>
+                            </div>
                           </div>
                         </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-8">
+                        <p className="text-slate-400">No content generated yet.</p>
                       </div>
-                    ))}
+                    )}
                   </div>
                 </CardContent>
               </Card>
