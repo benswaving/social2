@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
@@ -12,9 +12,23 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from ..agent.pipeline import verwerk_bezwaar
+from ..config import get_settings
 from ..db import get_session
 from ..ingest.intake import uit_tekst
-from ..models import AuditEvent, CaseStatus, Draft, Merit, Objection, Source, Verification
+from ..dossier import zoek_gerelateerd
+from ..models import (
+    Afloop,
+    AuditEvent,
+    CaseStatus,
+    Draft,
+    Job,
+    JobStatus,
+    Merit,
+    Objection,
+    Source,
+    Verification,
+)
+from ..worker import meld_aan, wachtrij_standen
 
 router = APIRouter(tags=["ui"], include_in_schema=False)
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent.parent / "templates"))
@@ -26,6 +40,7 @@ def werkvoorraad(
     status: str = "",
     kans: str = "",
     escalatie: str = "",
+    termijn: str = "",
     zoek: str = "",
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
@@ -45,6 +60,14 @@ def werkvoorraad(
         stmt = stmt.where(Objection.escalatie.is_(True))
     elif escalatie == "nee":
         stmt = stmt.where(Objection.escalatie.is_(False))
+    if termijn == "te_laat":
+        stmt = stmt.where(Objection.reactie_uiterlijk < date.today()).where(
+            Objection.status.notin_([CaseStatus.GOEDGEKEURD, CaseStatus.VERZONDEN])
+        )
+    elif termijn == "deze_week":
+        stmt = stmt.where(Objection.reactie_uiterlijk <= date.today() + timedelta(days=7)).where(
+            Objection.status.notin_([CaseStatus.GOEDGEKEURD, CaseStatus.VERZONDEN])
+        )
     if zoek:
         naald = f"%{zoek.strip()}%"
         stmt = stmt.where(
@@ -76,7 +99,15 @@ def werkvoorraad(
             select(func.count()).select_from(Objection).where(Objection.status == CaseStatus.MISLUKT)
         )
         or 0,
+        "te_laat": session.scalar(
+            select(func.count())
+            .select_from(Objection)
+            .where(Objection.reactie_uiterlijk < date.today())
+            .where(Objection.status.notin_([CaseStatus.GOEDGEKEURD, CaseStatus.VERZONDEN]))
+        )
+        or 0,
     }
+    wachtrij = wachtrij_standen(session)
 
     return templates.TemplateResponse(
         request=request,
@@ -84,7 +115,14 @@ def werkvoorraad(
         context={
             "bezwaren": bezwaren,
             "tellingen": tellingen,
-            "filters": {"status": status, "kans": kans, "escalatie": escalatie, "zoek": zoek},
+            "wachtrij": wachtrij,
+            "filters": {
+                "status": status,
+                "kans": kans,
+                "escalatie": escalatie,
+                "termijn": termijn,
+                "zoek": zoek,
+            },
             "statussen": [s.value for s in CaseStatus],
             "kansen": [m.value for m in Merit],
         },
@@ -97,8 +135,21 @@ def bezwaar(bezwaar_id: int, request: Request, session: Session = Depends(get_se
     if objection is None:
         raise HTTPException(status_code=404, detail="Bezwaar niet gevonden")
     concept = objection.concepten[-1] if objection.concepten else None
+    wacht = session.scalar(
+        select(Job)
+        .where(Job.objection_id == objection.id)
+        .where(Job.status.in_([JobStatus.WACHTEND, JobStatus.BEZIG]))
+    )
     return templates.TemplateResponse(
-        request=request, name="bezwaar.html", context={"b": objection, "concept": concept}
+        request=request,
+        name="bezwaar.html",
+        context={
+            "b": objection,
+            "concept": concept,
+            "gerelateerd": zoek_gerelateerd(session, objection),
+            "wacht": wacht,
+            "afloopwaarden": [a.value for a in Afloop],
+        },
     )
 
 
@@ -155,10 +206,13 @@ def ui_intrekken(
 def ui_tekst(tekst: str = Form(...), session: Session = Depends(get_session)) -> RedirectResponse:
     objection = uit_tekst(session, tekst)
     if objection.status == CaseStatus.NIEUW:
-        try:
-            verwerk_bezwaar(session, objection)
-        except ValueError:
-            pass
+        if get_settings().wachtrij_actief:
+            meld_aan(session, objection.id)
+        else:
+            try:
+                verwerk_bezwaar(session, objection)
+            except ValueError:
+                pass
     return RedirectResponse(url=f"/bezwaar/{objection.id}", status_code=303)
 
 
@@ -167,10 +221,13 @@ def ui_verwerk(bezwaar_id: int, session: Session = Depends(get_session)) -> Redi
     objection = session.get(Objection, bezwaar_id)
     if objection is None:
         raise HTTPException(status_code=404, detail="Bezwaar niet gevonden")
-    try:
-        verwerk_bezwaar(session, objection)
-    except ValueError:
-        pass
+    if get_settings().wachtrij_actief:
+        meld_aan(session, objection.id)
+    else:
+        try:
+            verwerk_bezwaar(session, objection)
+        except ValueError:
+            pass
     return RedirectResponse(url=f"/bezwaar/{bezwaar_id}", status_code=303)
 
 
@@ -213,3 +270,32 @@ def ui_goedkeuren(
     return RedirectResponse(url=f"/bezwaar/{bezwaar_id}", status_code=303)
 
 
+
+
+@router.post("/ui/bezwaar/{bezwaar_id}/afloop")
+def ui_afloop(
+    bezwaar_id: int,
+    afloop: str = Form(...),
+    vastgelegd_door: str = Form(...),
+    notitie: str = Form(default=""),
+    session: Session = Depends(get_session),
+) -> RedirectResponse:
+    objection = session.get(Objection, bezwaar_id)
+    if objection is None:
+        raise HTTPException(status_code=404, detail="Bezwaar niet gevonden")
+    try:
+        objection.afloop = Afloop(afloop)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=f"Onbekende afloop: {afloop}") from exc
+    objection.afloop_notitie = notitie or None
+    objection.afloop_vastgelegd_op = datetime.now(timezone.utc)
+    session.add(
+        AuditEvent(
+            objection_id=bezwaar_id,
+            actor=vastgelegd_door,
+            actie="afloop_vastgelegd",
+            detail={"afloop": afloop},
+        )
+    )
+    session.commit()
+    return RedirectResponse(url=f"/bezwaar/{bezwaar_id}", status_code=303)

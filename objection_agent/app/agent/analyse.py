@@ -10,6 +10,7 @@ from pathlib import Path
 
 import yaml
 
+from ..config import get_settings
 from ..knowledge.loader import SEED_DIR, load_taxonomie
 from .llm import LLMClient, LLMOnbeschikbaar
 
@@ -19,7 +20,15 @@ PROMPT_PAD = Path(__file__).resolve().parent / "prompts" / "analyse.md"
 PROMPT_VERSIE = "analyse-2026-08-1"
 
 EAN_RE = re.compile(r"\b(87\d{16})\b")
-DOSSIER_RE = re.compile(r"(?:dossier|zaak|kenmerk|referentie)\s*[:#]?\s*([A-Z0-9][A-Z0-9\-/]{3,20})", re.I)
+DOSSIER_RE = re.compile(
+    # Het trefwoord, dan zo min mogelijk tussenliggende tekst, dan het kenmerk zelf.
+    # De tussenruimte is lui: anders eet die de eerste letters van het kenmerk op.
+    r"(?:dossier|zaak|kenmerk|referentie|betreft|factuur(?:nummer)?|aanmaning)"
+    r"[^\n]{0,40}?"
+    r"\b([A-Z]{2,6}[-/]?\d{2,4}[-/]\d{2,8}|\d{4}[-/]\d{4,8})\b",
+    re.IGNORECASE,
+)
+
 DATUM_RE = re.compile(r"\b(\d{1,2})[-/](\d{1,2})[-/](\d{4})\b")
 
 
@@ -58,12 +67,25 @@ def _trefwoorden() -> dict[str, list[str]]:
 
 
 def _velden_uit_tekst(tekst: str) -> dict[str, str | None]:
+    """Kenmerk en EAN uit de brief halen.
+
+    Zonder kenmerk is een dossier niet op te zoeken en niet aan een eerdere brief
+    te koppelen, dus dit mag niet te nauw staan. Heeft de afdeling een eigen vaste
+    opbouw, zet die dan in OA_KENMERK_PATROON; die gaat voor.
+    """
     ean = EAN_RE.search(tekst)
-    dossier = DOSSIER_RE.search(tekst)
-    return {
-        "ean": ean.group(1) if ean else None,
-        "dossier_ref": dossier.group(1) if dossier else None,
-    }
+
+    dossier = None
+    eigen_patroon = get_settings().kenmerk_patroon
+    if eigen_patroon:
+        treffer = re.search(eigen_patroon, tekst, re.IGNORECASE)
+        if treffer:
+            dossier = treffer.group(1) if treffer.groups() else treffer.group(0)
+    if dossier is None:
+        treffer = DOSSIER_RE.search(tekst)
+        dossier = treffer.group(1) if treffer else None
+
+    return {"ean": ean.group(1) if ean else None, "dossier_ref": dossier}
 
 
 def _peildatum_uit_tekst(tekst: str) -> date | None:

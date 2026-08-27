@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from ..knowledge.store import haal_bronnen
+from ..termijnen import bepaal_termijn
 from ..models import Argument, AuditEvent, CaseStatus, ClaimedCitation, Draft, Merit, Objection
 from .analyse import analyseer
 from .assess import bepaal_beoordeling
@@ -58,9 +59,9 @@ def verwerk_bezwaar(
 
     # 3. Beleid
     beoordeling = bepaal_beoordeling(tekst, analyse, oordelen)
+    categorieen = sorted({a.categorie for a in analyse.argumenten})
 
     # 4. Bronnen ophalen voor de categorieen die in deze brief spelen
-    categorieen = sorted({a.categorie for a in analyse.argumenten})
     bronnen = haal_bronnen(session, categorieen, peildatum=analyse.peildatum, alleen_citeerbaar=True)
 
     # 5. Concept
@@ -77,6 +78,18 @@ def verwerk_bezwaar(
     objection.globale_kans = beoordeling.globale_kans
     objection.escalatie = beoordeling.escalatie
     objection.escalatie_reden = beoordeling.escalatie_reden
+
+    # De termijn kan korter worden zodra duidelijk is waar de brief over gaat:
+    # een AVG-verzoek kent een wettelijke reactietermijn. Nooit langer maken dan
+    # wat er al stond - dat zou uitstel opleveren dat niemand heeft besloten.
+    termijn = bepaal_termijn(
+        ontvangen_op=objection.ontvangen_op.date(),
+        categorieen=categorieen,
+        escalatie=beoordeling.escalatie,
+    )
+    if objection.reactie_uiterlijk is None or termijn.uiterlijk < objection.reactie_uiterlijk:
+        objection.reactie_uiterlijk = termijn.uiterlijk
+        objection.termijn_grond = termijn.grond
 
     objection.argumenten.clear()
     for index, argument in enumerate(analyse.argumenten, start=1):

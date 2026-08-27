@@ -13,6 +13,7 @@ from .api import cases, ingest, knowledge, review
 from .config import get_settings
 from .db import init_db, session_scope
 from .knowledge.loader import seed_sources
+from .worker import AchtergrondWerker, wachtrij_standen
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -38,12 +39,26 @@ async def lifespan(app: FastAPI):
             "Toegangsbeveiliging staat uit (OA_REQUIRE_AUTH=false). Alleen doen op een "
             "afgeschermde machine; dossiers bevatten persoonsgegevens."
         )
+    werker: AchtergrondWerker | None = None
+    if settings.wachtrij_actief and settings.werker_in_proces:
+        werker = AchtergrondWerker(interval=settings.werker_interval_seconden)
+        werker.start()
+    elif settings.wachtrij_actief:
+        logger.info(
+            "Wachtrij staat aan zonder meelopende werker. Start er een met "
+            "`python -m app.worker`, anders blijft er werk liggen."
+        )
+
     if settings.autosend_enabled:
         logger.error(
             "OA_AUTOSEND_ENABLED staat aan, maar deze applicatie verstuurt niets. "
             "Goedkeuring door een medewerker blijft vereist."
         )
-    yield
+    try:
+        yield
+    finally:
+        if werker is not None:
+            werker.stop()
 
 
 app = FastAPI(
@@ -67,10 +82,16 @@ app.include_router(review.router)
 
 @app.get("/gezondheid", tags=["systeem"])
 def gezondheid() -> dict:
+    settings = get_settings()
     client = LLMClient()
+    with session_scope() as session:
+        wachtrij = wachtrij_standen(session)
     return {
         "status": "ok",
         "llm_provider": client.provider,
         "llm_model": client.model,
         "verzendt_zelf": False,
+        "wachtrij_actief": settings.wachtrij_actief,
+        "werker_in_proces": settings.werker_in_proces,
+        "wachtrij": wachtrij,
     }

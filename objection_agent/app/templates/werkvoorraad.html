@@ -3,7 +3,14 @@
 <h2 style="margin-top:0">Werkvoorraad</h2>
 <p class="gedempt" style="margin-top:-8px">
   {{ tellingen.open }} open &middot; {{ tellingen.escalatie }} naar een mens &middot;
+  {% if tellingen.te_laat %}<span class="blokkerend">{{ tellingen.te_laat }} over de termijn</span> &middot;{% endif %}
   {{ tellingen.mislukt }} mislukt &middot; {{ tellingen.totaal }} totaal
+  {% if wachtrij.wachtend or wachtrij.bezig %}
+    &middot; wachtrij: {{ wachtrij.wachtend }} wachtend, {{ wachtrij.bezig }} bezig
+  {% endif %}
+  {% if wachtrij.mislukt %}
+    &middot; <span class="blokkerend">{{ wachtrij.mislukt }} verwerking mislukt</span>
+  {% endif %}
 </p>
 
 <form method="get" action="/" class="paneel" style="margin-bottom:16px; display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end">
@@ -18,6 +25,12 @@
     <select name="kans">
       <option value="">alle</option>
       {% for k in kansen %}<option value="{{ k }}" {% if filters.kans == k %}selected{% endif %}>{{ k }}</option>{% endfor %}
+    </select></label>
+  <label class="gedempt">Termijn<br>
+    <select name="termijn">
+      <option value="">alle</option>
+      <option value="te_laat" {% if filters.termijn == "te_laat" %}selected{% endif %}>over de termijn</option>
+      <option value="deze_week" {% if filters.termijn == "deze_week" %}selected{% endif %}>binnen 7 dagen</option>
     </select></label>
   <label class="gedempt">Escalatie<br>
     <select name="escalatie">
@@ -44,7 +57,7 @@
 {% else %}
 <table>
   <tr><th>#</th><th>Afzender</th><th>Kenmerk</th><th>Status</th><th>Kans</th>
-      <th>Escalatie</th><th>AI-signaal</th><th>Ontvangen</th></tr>
+      <th>Escalatie</th><th>AI-signaal</th><th>Uiterlijk</th></tr>
   {% for b in bezwaren %}
   <tr>
     <td><a href="/bezwaar/{{ b.id }}">{{ b.id }}</a></td>
@@ -54,7 +67,17 @@
     <td><span class="vlag {{ b.globale_kans.value }}">{{ b.globale_kans.value }}</span></td>
     <td>{% if b.escalatie %}<span class="vlag blokkerend">naar mens</span>{% else %}—{% endif %}</td>
     <td>{{ "%.0f%%"|format((b.ai_gegenereerd_signaal or 0) * 100) }}</td>
-    <td class="gedempt">{{ b.ontvangen_op.strftime("%d-%m-%Y %H:%M") }}</td>
+    <td>
+      {% if b.reactie_uiterlijk %}
+        {% if b.te_laat %}
+          <span class="vlag blokkerend">{{ b.reactie_uiterlijk.strftime("%d-%m-%Y") }}</span>
+        {% elif b.dagen_resterend is not none and b.dagen_resterend <= 7 %}
+          <span class="vlag waarschuwing">nog {{ b.dagen_resterend }} dag(en)</span>
+        {% else %}
+          <span class="gedempt">{{ b.reactie_uiterlijk.strftime("%d-%m-%Y") }}</span>
+        {% endif %}
+      {% else %}<span class="gedempt">&mdash;</span>{% endif %}
+    </td>
   </tr>
   {% endfor %}
 </table>

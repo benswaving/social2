@@ -11,10 +11,18 @@ from sqlalchemy.orm import Session
 
 from ..config import get_settings
 from ..models import AuditEvent, CaseStatus, Objection
+from ..termijnen import bepaal_termijn
 from .imap_client import Bericht, haal_berichten
 from .pdf_text import extraheer
 
 logger = logging.getLogger(__name__)
+
+
+def _zet_termijn(objection: Objection) -> None:
+    """Voorlopige termijn bij binnenkomst; de analyse kan hem verkorten."""
+    termijn = bepaal_termijn(ontvangen_op=objection.ontvangen_op.date())
+    objection.reactie_uiterlijk = termijn.uiterlijk
+    objection.termijn_grond = termijn.grond
 
 
 def _bestandshash(pad: Path) -> str:
@@ -59,6 +67,7 @@ def uit_bestand(
     )
     session.add(objection)
     session.flush()
+    _zet_termijn(objection)
     session.add(
         AuditEvent(
             objection_id=objection.id,
@@ -87,6 +96,7 @@ def uit_tekst(session: Session, tekst: str, *, afzender_naam: str | None = None)
     )
     session.add(objection)
     session.flush()
+    _zet_termijn(objection)
     session.add(AuditEvent(objection_id=objection.id, actor="systeem", actie="intake", detail={"kanaal": "api"}))
     session.commit()
     return objection
@@ -121,6 +131,7 @@ def uit_bericht(session: Session, bericht: Bericht) -> Objection:
     )
     session.add(objection)
     session.flush()
+    _zet_termijn(objection)
     session.add(
         AuditEvent(
             objection_id=objection.id,

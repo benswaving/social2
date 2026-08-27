@@ -57,6 +57,27 @@ class Settings(BaseSettings):
     ui_password: str | None = None
     auth_token: str | None = None
 
+    # --- Wachtrij en werker ---------------------------------------------
+    # Staat de wachtrij aan, dan geven de intake-routes meteen antwoord en doet
+    # een werker het zware werk. Uit betekent: verwerken binnen het verzoek.
+    wachtrij_actief: bool = True
+    werker_in_proces: bool = True   # meelopende thread; zet uit bij een los werkproces
+    werker_interval_seconden: float = 2.0
+    werker_vastloper_minuten: int = 15
+
+    # --- Herkenning -----------------------------------------------------
+    # Eigen opbouw van het dossierkenmerk, bijvoorbeeld r"(ASC-\d{4}-\d{5})".
+    # Leeg laten om de ingebouwde herkenning te gebruiken.
+    kenmerk_patroon: str | None = None
+
+    # --- Termijnen ------------------------------------------------------
+    # Aantal kalenderdagen waarbinnen een antwoord de deur uit hoort. De AVG-termijn
+    # is wettelijk (een maand); de andere twee zijn een werkafspraak van de afdeling
+    # en mogen worden bijgesteld.
+    termijn_avg_dagen: int = 28
+    termijn_escalatie_dagen: int = 14
+    termijn_standaard_dagen: int = 21
+
     # --- Bewaartermijn --------------------------------------------------
     # Na deze termijn mag een afgehandeld dossier worden opgeruimd. Stem af met
     # de functionaris gegevensbescherming; nul betekent: niet automatisch opruimen.

@@ -12,15 +12,35 @@ from sqlalchemy.orm import Session
 
 from ..agent.pipeline import verwerk_bezwaar
 from ..config import get_settings
+from ..worker import meld_aan
 from ..db import get_session
 from ..ingest.intake import uit_bestand, uit_tekst
-from ..models import AuditEvent, CaseStatus, Draft, Objection
-from ..schemas import BezwaarDetail, BezwaarKort, ConceptUit, GoedkeuringIn, TekstIn
+from ..models import Afloop, AuditEvent, CaseStatus, Draft, Objection
+from ..schemas import AfloopIn, BezwaarDetail, BezwaarKort, ConceptUit, GoedkeuringIn, TekstIn
+from ..dossier import zoek_gerelateerd
 
 router = APIRouter(prefix="/api/bezwaren", tags=["bezwaren"])
 
 TOEGESTANE_TYPES = {".pdf", ".txt", ".eml", ".md"}
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+
+
+def _verwerk_of_meld_aan(session: Session, objection: Objection, response: Response) -> None:
+    """Verwerkt meteen, of zet het dossier in de wachtrij.
+
+    Met een taalmodel duurt analyseren te lang voor een HTTP-verzoek. Staat de
+    wachtrij aan, dan antwoordt deze route met 202: het dossier is aangenomen en
+    een werker pakt het op.
+    """
+    if get_settings().wachtrij_actief:
+        meld_aan(session, objection.id)
+        response.status_code = 202
+        return
+    try:
+        verwerk_bezwaar(session, objection)
+    except ValueError:
+        pass  # de fout staat al op het dossier
+    session.refresh(objection)
 
 
 def _haal(session: Session, bezwaar_id: int) -> Objection:
@@ -60,8 +80,7 @@ def via_tekst(
         response.status_code = 200
         return objection
     if payload.direct_verwerken:
-        verwerk_bezwaar(session, objection)
-        session.refresh(objection)
+        _verwerk_of_meld_aan(session, objection, response)
     return objection
 
 
@@ -92,8 +111,7 @@ async def via_upload(
         response.status_code = 200  # al eerder ingelezen
         return objection
     if objection.status == CaseStatus.NIEUW:
-        verwerk_bezwaar(session, objection)
-        session.refresh(objection)
+        _verwerk_of_meld_aan(session, objection, response)
     return objection
 
 
@@ -209,3 +227,43 @@ def verwijderen(
     session.add(AuditEvent(objection_id=None, actor=actor, actie="dossier_verwijderd", detail=spoor))
     session.commit()
     return Response(status_code=204)
+
+
+@router.post("/{bezwaar_id}/afloop", response_model=BezwaarDetail)
+def afloop_vastleggen(
+    bezwaar_id: int,
+    payload: AfloopIn,
+    session: Session = Depends(get_session),
+) -> Objection:
+    """Legt vast hoe het dossier werkelijk is afgelopen.
+
+    Zonder deze stap blijft de kansinschatting een aanname: er is dan niets om
+    haar aan te toetsen. `python -m app.kalibratie` zet de inschattingen naast
+    de werkelijke afloop per categorie.
+    """
+    objection = _haal(session, bezwaar_id)
+    try:
+        objection.afloop = Afloop(payload.afloop)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=f"Onbekende afloop: {payload.afloop}") from exc
+
+    objection.afloop_notitie = payload.notitie
+    objection.afloop_vastgelegd_op = datetime.now(timezone.utc)
+    session.add(
+        AuditEvent(
+            objection_id=objection.id,
+            actor=payload.vastgelegd_door,
+            actie="afloop_vastgelegd",
+            detail={"afloop": objection.afloop.value},
+        )
+    )
+    session.commit()
+    session.refresh(objection)
+    return objection
+
+
+@router.get("/{bezwaar_id}/gerelateerd", response_model=list[BezwaarKort])
+def gerelateerd(bezwaar_id: int, session: Session = Depends(get_session)) -> list[Objection]:
+    """Eerdere brieven van dezelfde klant of over dezelfde aansluiting."""
+    objection = _haal(session, bezwaar_id)
+    return zoek_gerelateerd(session, objection)

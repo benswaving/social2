@@ -161,6 +161,64 @@ de medewerker maar niet citeerbaar.
 .venv/bin/uvicorn app.main:app --reload --port 8100
 ```
 
+Analyseren duurt met een taalmodel al gauw een halve minuut. Dat gebeurt daarom
+niet in het HTTP-verzoek: de intake-routes antwoorden met **202** en zetten het
+dossier in een wachtrij. Standaard loopt er een werker mee in het webproces; in
+productie is een los proces beter:
+
+```bash
+OA_WERKER_IN_PROCES=false .venv/bin/uvicorn app.main:app --port 8100   # webproces
+.venv/bin/python -m app.worker                                        # werker
+.venv/bin/python -m app.worker --eenmalig                              # rij leegwerken
+```
+
+De wachtrij is een tabel in dezelfde database — geen Redis of Celery om te
+beheren. Een taak die tijdens de verwerking afbreekt blijft op `bezig` staan en
+wordt na `OA_WERKER_VASTLOPER_MINUTEN` opnieuw opgepakt; na drie mislukte
+pogingen gaat het dossier op `mislukt` met de foutmelding erbij. Zet
+`OA_WACHTRIJ_ACTIEF=false` om alles binnen het verzoek te doen (handig bij lage
+volumes en in tests).
+
+## Postbus
+
+```bash
+.venv/bin/python -m app.postbus test       # verbinding en mappen controleren
+.venv/bin/python -m app.postbus ophalen    # ongelezen berichten binnenhalen
+```
+
+`test` opent de map alleen-lezen en telt; er wordt niets gelezen, gemarkeerd of
+verplaatst. Begin daarmee, en zet `OA_IMAP_MAX_PER_RUN` de eerste keren laag.
+
+## Termijnen
+
+Elk dossier krijgt bij binnenkomst een uiterste reactiedatum, die na de analyse
+korter kan worden. Er gelden drie termijnen en de **kortste** wint — de
+AVG-termijn is een wettelijk maximum, geen streefdatum, dus een AVG-verzoek dat
+ook geëscaleerd is blijft niet langer liggen dan een gewone escalatie.
+
+| Termijn | Standaard | Status |
+|---|---|---|
+| `OA_TERMIJN_AVG_DAGEN` | 28 | wettelijk (een maand) |
+| `OA_TERMIJN_ESCALATIE_DAGEN` | 14 | werkafspraak, stel bij naar eigen beleid |
+| `OA_TERMIJN_STANDAARD_DAGEN` | 21 | werkafspraak, stel bij naar eigen beleid |
+
+De werkvoorraad kleurt wat over de termijn is en heeft een filter op *over de
+termijn* en *binnen 7 dagen*.
+
+## De inschattingen toetsen
+
+De priors in `taxonomie.yaml` zijn ingeschat. Leg per dossier vast hoe het
+werkelijk afliep — via het scherm of `POST /api/bezwaren/{id}/afloop` — en zet ze
+daarna naast elkaar:
+
+```bash
+.venv/bin/python -m app.kalibratie --minimaal 20
+```
+
+Wat je zoekt is een categorie die structureel wordt **onderschat**: laag
+ingeschat, maar de vordering wordt in de praktijk vaak gecorrigeerd. Dat betekent
+dat de afdeling daar bezwaren afwijst die hout snijden, en dat is de dure fout.
+
 - `http://localhost:8100/` — werkvoorraad en review-scherm
 - `http://localhost:8100/docs` — API
 
@@ -220,6 +278,9 @@ app/
   knowledge/     kennisbank, fetchers voor wetten.overheid.nl en rechtspraak.nl
     seed/        taxonomie, wetsartikelen, jurisprudentieprofielen, trefwoorden
   ingest/        PDF/OCR, IMAP, intake
+  worker.py      wachtrij en achtergrondverwerking
+  termijnen.py   uiterste reactiedatum per dossier
+  kalibratie.py  inschattingen naast de werkelijke afloop
   api/           REST + server-rendered review-UI
   models.py      bezwaren, argumenten, bronnen, concepten, audit
 tests/           45 tests, offline

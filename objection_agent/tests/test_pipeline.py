@@ -172,3 +172,28 @@ def test_energiewet_geldt_niet_voor_een_oude_vordering(session):
     assert geldig_op(ewet1998, _date(2023, 5, 1)) is True
     assert geldig_op(energiewet, _date(2026, 3, 1)) is True
     assert geldig_op(ewet1998, _date(2026, 3, 1)) is False
+
+
+def test_kenmerk_wordt_ook_uit_een_betreft_regel_gehaald(session):
+    """Zonder kenmerk is een dossier niet op te zoeken en niet te koppelen."""
+    from app.agent.analyse import _velden_uit_tekst
+
+    varianten = {
+        "Betreft ASC-2026-55010": "ASC-2026-55010",
+        "Betreft: uw aanmaning, kenmerk ASC-2019-41207": "ASC-2019-41207",
+        "kenmerk: ASC-2024-88123": "ASC-2024-88123",
+        "Onderwerp: uw factuurnummer 2024/887766": "2024/887766",
+    }
+    for tekst, verwacht in varianten.items():
+        assert _velden_uit_tekst(tekst)["dossier_ref"] == verwacht, tekst
+
+
+def test_eigen_kenmerkpatroon_gaat_voor(session, monkeypatch):
+    from app.agent import analyse as analyse_module
+    from app.config import get_settings
+
+    instellingen = get_settings().model_copy(update={"kenmerk_patroon": r"(ZAAK\d{6})"})
+    monkeypatch.setattr(analyse_module, "get_settings", lambda: instellingen)
+
+    velden = analyse_module._velden_uit_tekst("Betreft ASC-2026-55010, intern ZAAK998877.")
+    assert velden["dossier_ref"] == "ZAAK998877"

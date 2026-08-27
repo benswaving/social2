@@ -80,6 +80,63 @@ def _bijlagen(bericht: Message, doelmap: Path, sleutel: str) -> list[Path]:
     return opgeslagen
 
 
+def bericht_uit_email(bericht: Message, ruw: bytes, doelmap: Path) -> Bericht:
+    """Zet een e-mail om in een Bericht. Geen netwerk, dus goed te testen."""
+    message_id = _decodeer(bericht.get("Message-ID")) or hashlib.sha256(ruw).hexdigest()
+    sleutel = hashlib.sha256(message_id.encode()).hexdigest()[:16]
+    afzender = _decodeer(bericht.get("From"))
+    adres = re.search(r"<([^>]+)>", afzender)
+
+    return Bericht(
+        message_id=message_id,
+        afzender_naam=afzender.split("<")[0].strip().strip('"') or None,
+        afzender_email=adres.group(1) if adres else (afzender or None),
+        onderwerp=_decodeer(bericht.get("Subject")),
+        tekst=_platte_tekst(bericht),
+        bijlagen=_bijlagen(bericht, doelmap, sleutel),
+    )
+
+
+def test_verbinding() -> dict:
+    """Maakt verbinding en telt, zonder iets te lezen of te verplaatsen.
+
+    Om inloggegevens en mapnamen te controleren voordat er post door de molen
+    gaat. Er wordt niets gemarkeerd, verplaatst of verwijderd.
+    """
+    settings = get_settings()
+    if not (settings.imap_host and settings.imap_user and settings.imap_password):
+        raise RuntimeError(
+            "IMAP is niet geconfigureerd. Zet OA_IMAP_HOST, OA_IMAP_USER en OA_IMAP_PASSWORD."
+        )
+
+    verbinding = imaplib.IMAP4_SSL(settings.imap_host, settings.imap_port)
+    try:
+        verbinding.login(settings.imap_user, settings.imap_password)
+        status, _ = verbinding.select(settings.imap_folder, readonly=True)
+        if status != "OK":
+            raise RuntimeError(f"Map '{settings.imap_folder}' bestaat niet of is niet leesbaar.")
+        _, ongelezen = verbinding.search(None, "UNSEEN")
+        _, alles = verbinding.search(None, "ALL")
+        mappen = []
+        status, ruwe_mappen = verbinding.list()
+        if status == "OK":
+            mappen = [regel.decode(errors="replace").split(' "/" ')[-1].strip('"') for regel in ruwe_mappen]
+        return {
+            "host": settings.imap_host,
+            "map": settings.imap_folder,
+            "ongelezen": len(ongelezen[0].split()) if ongelezen and ongelezen[0] else 0,
+            "totaal": len(alles[0].split()) if alles and alles[0] else 0,
+            "verwerkt_map_bestaat": settings.imap_processed_folder in mappen,
+            "mappen": mappen[:40],
+        }
+    finally:
+        try:
+            verbinding.close()
+        except imaplib.IMAP4.error:
+            pass
+        verbinding.logout()
+
+
 def haal_berichten(maximum: int | None = None) -> list[Bericht]:
     settings = get_settings()
     if not (settings.imap_host and settings.imap_user and settings.imap_password):
@@ -105,24 +162,8 @@ def haal_berichten(maximum: int | None = None) -> list[Bericht]:
             status, ruw = verbinding.fetch(bericht_id, "(RFC822)")
             if status != "OK" or not ruw or not isinstance(ruw[0], tuple):
                 continue
-            bericht = email.message_from_bytes(ruw[0][1])
-
-            message_id = _decodeer(bericht.get("Message-ID")) or hashlib.sha256(
-                ruw[0][1]
-            ).hexdigest()
-            sleutel = hashlib.sha256(message_id.encode()).hexdigest()[:16]
-            afzender = _decodeer(bericht.get("From"))
-            adres = re.search(r"<([^>]+)>", afzender)
-
             berichten.append(
-                Bericht(
-                    message_id=message_id,
-                    afzender_naam=afzender.split("<")[0].strip().strip('"') or None,
-                    afzender_email=adres.group(1) if adres else (afzender or None),
-                    onderwerp=_decodeer(bericht.get("Subject")),
-                    tekst=_platte_tekst(bericht),
-                    bijlagen=_bijlagen(bericht, doelmap, sleutel),
-                )
+                bericht_uit_email(email.message_from_bytes(ruw[0][1]), ruw[0][1], doelmap)
             )
 
             if settings.imap_processed_folder:

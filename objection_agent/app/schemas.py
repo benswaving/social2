@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -60,6 +60,9 @@ class BezwaarKort(BaseModel):
     escalatie: bool
     ai_gegenereerd_signaal: float | None = None
     ontvangen_op: datetime
+    reactie_uiterlijk: date | None = None
+    te_laat: bool = False
+    afloop: str = "onbekend"
 
 
 class BezwaarDetail(BezwaarKort):
@@ -69,6 +72,8 @@ class BezwaarDetail(BezwaarKort):
     escalatie_reden: str | None = None
     ai_signaal_toelichting: str | None = None
     analyse_fout: str | None = None
+    termijn_grond: str | None = None
+    afloop_notitie: str | None = None
     argumenten: list[ArgumentUit] = Field(default_factory=list)
     aangehaalde_bronnen: list[BronoordeelUit] = Field(default_factory=list)
     concepten: list[ConceptUit] = Field(default_factory=list)
@@ -86,6 +91,17 @@ class GoedkeuringIn(BaseModel):
     aangepaste_tekst: str | None = Field(
         default=None, description="Definitieve tekst als de medewerker het concept heeft bijgewerkt"
     )
+
+
+class AfloopIn(BaseModel):
+    afloop: str = Field(
+        description=(
+            "onbekend | vordering_gehandhaafd | deels_gecorrigeerd | "
+            "vordering_ingetrokken | geschil"
+        )
+    )
+    vastgelegd_door: str = Field(min_length=2)
+    notitie: str | None = None
 
 
 class BronIn(BaseModel):

@@ -11,6 +11,41 @@
   tekstkwaliteit: {{ b.tekst_kwaliteit }}
 </p>
 
+{% if b.reactie_uiterlijk %}
+<div class="melding {{ 'blokkerend' if b.te_laat else 'waarschuwing' if (b.dagen_resterend is not none and b.dagen_resterend <= 7) else '' }}">
+  <strong>
+    Antwoord uiterlijk {{ b.reactie_uiterlijk.strftime("%d-%m-%Y") }}
+    {% if b.te_laat %}— over de termijn{% elif b.dagen_resterend is not none %}— nog {{ b.dagen_resterend }} dag(en){% endif %}
+  </strong>
+  {{ b.termijn_grond }}
+</div>
+{% endif %}
+
+{% if wacht %}
+<div class="melding waarschuwing">
+  <strong>Staat in de wachtrij ({{ wacht.status.value }})</strong>
+  Een werker pakt dit dossier op. Ververs deze pagina over een moment.
+  {% if wacht.fout %}<br>Vorige poging: {{ wacht.fout }}{% endif %}
+</div>
+{% endif %}
+
+{% if gerelateerd %}
+<div class="melding">
+  <strong>{{ gerelateerd|length }} eerder(e) dossier(s) van deze klant of aansluiting</strong>
+  <ul>
+    {% for g in gerelateerd %}
+    <li><a href="/bezwaar/{{ g.id }}">#{{ g.id }}</a>
+      &middot; {{ g.ontvangen_op.strftime("%d-%m-%Y") }}
+      &middot; {{ g.status.value }}
+      {% if g.afloop.value != "onbekend" %}&middot; afloop: {{ g.afloop.value.replace("_", " ") }}{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  <p class="gedempt" style="margin:6px 0 0">Niet automatisch samengevoegd: of het dezelfde
+    zaak is, beoordeelt u zelf.</p>
+</div>
+{% endif %}
+
 {% if b.escalatie %}
 <div class="melding blokkerend">
   <strong>Dit dossier gaat naar een medewerker met juridische kennis</strong>
@@ -118,5 +153,27 @@
       {% endif %}
     {% endif %}
   </div>
+</div>
+
+<div class="paneel" style="margin-top:22px">
+  <h2>Afloop vastleggen</h2>
+  <p class="gedempt" style="margin-top:0">
+    Hoe is dit dossier werkelijk afgelopen? Zonder dit blijft de kansinschatting een
+    aanname en valt er niets te ijken.
+    {% if b.afloop.value != "onbekend" %}
+      <br>Nu vastgelegd: <strong>{{ b.afloop.value.replace("_", " ") }}</strong>
+      {% if b.afloop_notitie %}— {{ b.afloop_notitie }}{% endif %}
+    {% endif %}
+  </p>
+  <form method="post" action="/ui/bezwaar/{{ b.id }}/afloop" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center">
+    <select name="afloop">
+      {% for a in afloopwaarden %}
+      <option value="{{ a }}" {% if b.afloop.value == a %}selected{% endif %}>{{ a.replace("_", " ") }}</option>
+      {% endfor %}
+    </select>
+    <input type="text" name="vastgelegd_door" placeholder="Uw naam" required>
+    <input type="text" name="notitie" placeholder="Notitie (optioneel)" style="width:30%">
+    <button type="submit" class="secundair">Vastleggen</button>
+  </form>
 </div>
 {% endblock %}

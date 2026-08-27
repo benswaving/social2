@@ -11,6 +11,8 @@ _TMP = Path(tempfile.mkdtemp(prefix="asc-agent-tests-"))
 os.environ["OA_DATABASE_URL"] = f"sqlite:///{_TMP / 'test.db'}"
 os.environ["OA_LLM_PROVIDER"] = "offline"
 os.environ["OA_REQUIRE_AUTH"] = "false"
+os.environ["OA_WACHTRIJ_ACTIEF"] = "false"
+os.environ["OA_WERKER_IN_PROCES"] = "false"
 os.environ.pop("OA_OPENAI_API_KEY", None)
 
 import pytest  # noqa: E402

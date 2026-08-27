@@ -232,3 +232,81 @@ def test_werkvoorraad_kan_gefilterd_worden(client):
 
     zonder_treffer = client.get("/?zoek=bestaat-niet-xyz")
     assert "Geen dossiers gevonden" in zonder_treffer.text
+
+
+def test_intake_geeft_202_als_de_wachtrij_aanstaat(client, monkeypatch):
+    """Met een taalmodel duurt analyseren te lang voor een HTTP-verzoek."""
+    from app.api import cases
+    from app.config import get_settings
+
+    instellingen = get_settings().model_copy(update={"wachtrij_actief": True})
+    monkeypatch.setattr(cases, "get_settings", lambda: instellingen)
+
+    antwoord = client.post(
+        "/api/bezwaren/tekst", json={"tekst": "Ik heb nooit een contract getekend met u."}
+    )
+    assert antwoord.status_code == 202
+    body = antwoord.json()
+    assert body["concepten"] == []  # nog niets verwerkt
+
+    from app.db import SessionLocal
+    from app.worker import verwerk_alles
+
+    with SessionLocal() as s:
+        assert verwerk_alles(s) == 1
+
+    verwerkt = client.get(f"/api/bezwaren/{body['id']}").json()
+    assert verwerkt["concepten"], "de werker moet een concept hebben opgeleverd"
+
+
+def test_afloop_vastleggen(client):
+    bezwaar = client.post("/api/bezwaren/tekst", json={"tekst": BRIEF}).json()
+
+    antwoord = client.post(
+        f"/api/bezwaren/{bezwaar['id']}/afloop",
+        json={
+            "afloop": "deels_gecorrigeerd",
+            "vastgelegd_door": "medewerker-042",
+            "notitie": "Periode na overdracht gecrediteerd",
+        },
+    )
+    assert antwoord.status_code == 200
+    assert antwoord.json()["afloop"] == "deels_gecorrigeerd"
+
+    fout = client.post(
+        f"/api/bezwaren/{bezwaar['id']}/afloop",
+        json={"afloop": "bestaat-niet", "vastgelegd_door": "medewerker-042"},
+    )
+    assert fout.status_code == 422
+
+
+def test_gerelateerde_dossiers_via_de_api(client):
+    eerste = client.post(
+        "/api/bezwaren/tekst",
+        json={"tekst": "Eerste brief over EAN 871685920000123456, ik heb niets getekend."},
+    ).json()
+    tweede = client.post(
+        "/api/bezwaren/tekst",
+        json={"tekst": "Tweede brief over EAN 871685920000123456, u reageerde niet."},
+    ).json()
+
+    gerelateerd = client.get(f"/api/bezwaren/{tweede['id']}/gerelateerd").json()
+    assert [g["id"] for g in gerelateerd] == [eerste["id"]]
+
+
+def test_werkvoorraad_toont_termijn_en_kan_op_te_laat_filteren(client):
+    from datetime import date, timedelta
+
+    bezwaar = client.post("/api/bezwaren/tekst", json={"tekst": BRIEF}).json()
+
+    from app.db import SessionLocal
+    from app.models import Objection
+
+    with SessionLocal() as s:
+        objection = s.get(Objection, bezwaar["id"])
+        objection.reactie_uiterlijk = date.today() - timedelta(days=3)
+        s.commit()
+
+    pagina = client.get("/?termijn=te_laat")
+    assert pagina.status_code == 200
+    assert "over de termijn" in pagina.text

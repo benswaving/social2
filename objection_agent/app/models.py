@@ -48,6 +48,23 @@ class Merit(str, enum.Enum):
     ONBEPAALD = "onbepaald"
 
 
+class JobStatus(str, enum.Enum):
+    WACHTEND = "wachtend"
+    BEZIG = "bezig"
+    KLAAR = "klaar"
+    MISLUKT = "mislukt"
+
+
+class Afloop(str, enum.Enum):
+    """Hoe een dossier werkelijk is afgelopen - de meetlat voor de inschatting."""
+
+    ONBEKEND = "onbekend"
+    VORDERING_GEHANDHAAFD = "vordering_gehandhaafd"
+    DEELS_GECORRIGEERD = "deels_gecorrigeerd"
+    VORDERING_INGETROKKEN = "vordering_ingetrokken"
+    GESCHIL = "geschil"  # doorgezet naar rechter of geschilleninstantie
+
+
 class SourceKind(str, enum.Enum):
     WET = "wet"                      # wetsartikel (Energiewet, BW, ...)
     JURISPRUDENTIE = "jurisprudentie"
@@ -91,8 +108,32 @@ class Objection(Base):
     escalatie_reden: Mapped[str | None] = mapped_column(Text)
     analyse_fout: Mapped[str | None] = mapped_column(Text)
 
+    # Termijnbewaking: wanneer moet hier uiterlijk een antwoord uit?
+    reactie_uiterlijk: Mapped[date | None] = mapped_column(Date, index=True)
+    termijn_grond: Mapped[str | None] = mapped_column(String(64))
+
+    # Werkelijke afloop, om de inschattingen aan te kunnen toetsen.
+    afloop: Mapped[Afloop] = mapped_column(Enum(Afloop), default=Afloop.ONBEKEND, index=True)
+    afloop_notitie: Mapped[str | None] = mapped_column(Text)
+    afloop_vastgelegd_op: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    @property
+    def te_laat(self) -> bool:
+        if self.reactie_uiterlijk is None or self.status in (
+            CaseStatus.GOEDGEKEURD,
+            CaseStatus.VERZONDEN,
+        ):
+            return False
+        return self.reactie_uiterlijk < date.today()
+
+    @property
+    def dagen_resterend(self) -> int | None:
+        if self.reactie_uiterlijk is None:
+            return None
+        return (self.reactie_uiterlijk - date.today()).days
 
     argumenten: Mapped[list["Argument"]] = relationship(
         back_populates="objection", cascade="all, delete-orphan", order_by="Argument.volgnummer"
@@ -246,3 +287,33 @@ class AuditEvent(Base):
     ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     objection: Mapped["Objection"] = relationship(back_populates="events")
+
+
+class Job(Base):
+    """Werk dat buiten het verzoek om wordt gedaan.
+
+    Bewust een tabel en geen Redis-wachtrij: dit draait op dezelfde database die er
+    toch al is, werkt met SQLite zowel als Postgres, en overleeft een herstart. Het
+    volume van een bezwarenafdeling rechtvaardigt geen extra dienst om te beheren.
+    """
+
+    __tablename__ = "jobs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    soort: Mapped[str] = mapped_column(String(48), index=True)
+    objection_id: Mapped[int | None] = mapped_column(
+        ForeignKey("objections.id", ondelete="CASCADE"), index=True
+    )
+    status: Mapped[JobStatus] = mapped_column(Enum(JobStatus), default=JobStatus.WACHTEND, index=True)
+
+    pogingen: Mapped[int] = mapped_column(Integer, default=0)
+    max_pogingen: Mapped[int] = mapped_column(Integer, default=3)
+    fout: Mapped[str | None] = mapped_column(Text)
+
+    aangemaakt_op: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    gestart_op: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    geeindigd_op: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    @property
+    def opnieuw_proberen(self) -> bool:
+        return self.pogingen < self.max_pogingen
