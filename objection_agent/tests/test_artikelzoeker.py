@@ -96,3 +96,40 @@ def test_ingetrokken_wetten_hebben_een_einddatum_en_opvolger():
         assert wetten[afkorting]["vervangen_door"] == "Ew"
     assert wetten["Ew"]["bwb_id"] == "BWBR0050714"
     assert wetten["Ew"]["geldig_vanaf"] == "2026-01-01"
+
+
+def test_artikel_zonder_trefwoordtreffer_valt_af(artikelen):
+    """Ruisonderdrukking: alleen dezelfde begrippen noemen is niet genoeg.
+
+    Artikel 4.20 bevat zowel 'netbeheerder' als 'aansluiting', maar gaat over
+    tarieven. Zonder drempel kwam het als tweede treffer bij de aansluittaak
+    binnen, en dat is precies het soort onderbouwing dat in een brief misstaat.
+    """
+    treffers = doorzoek(
+        artikelen,
+        verplicht=["netbeheerder", "aansluiting"],
+        trefwoorden=["taak", "verzoek", "realiseren", "aangeslotene"],
+        maximum=4,
+    )
+    assert [t.nummer for t in treffers] == ["3.10"]
+
+
+def test_uitsluitwoorden_houden_een_artikel_buiten_de_treffers(artikelen):
+    treffers = doorzoek(
+        artikelen,
+        verplicht=["netbeheerder"],
+        trefwoorden=["transport", "aansluiting"],
+        uitsluiten=["tarief"],
+    )
+    assert "4.20" not in [t.nummer for t in treffers]
+
+
+def test_drempel_is_instelbaar(artikelen):
+    zonder_drempel = doorzoek(
+        artikelen,
+        verplicht=["netbeheerder", "aansluiting"],
+        trefwoorden=["taak", "verzoek"],
+        maximum=4,
+        minimale_score=0,
+    )
+    assert "4.20" in [t.nummer for t in zonder_drempel]

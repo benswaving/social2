@@ -236,8 +236,10 @@ artikelen:
 # bij het KOOP-repository, doorzoekt de artikelen op deze trefwoorden en slaat op wat
 # er echt in staat, met het echte nummer en de echte tekst.
 #
-# `verplicht` moet allemaal voorkomen in het artikel; `trefwoorden` bepalen de
-# rangschikking. Wat gevonden wordt krijgt de tag `auto-gemapt`: de tekst is
+# `verplicht` moet allemaal voorkomen in het artikel, `uitsluiten` mag juist niet
+# voorkomen, en `trefwoorden` bepalen de rangschikking. Een artikel dat geen enkel
+# trefwoord raakt valt af: dat is meestal een bepaling die toevallig dezelfde
+# begrippen noemt. Wat gevonden wordt krijgt de tag `auto-gemapt`: de tekst is
 # geverifieerd, maar of het artikel bij deze bezwaarcategorie hoort beoordeelt een
 # jurist. Pas na accorderen mag de agent ernaar verwijzen.
 
@@ -247,6 +249,7 @@ artikelzoekers:
     doel: "De wettelijke taak van de netbeheerder om aan te sluiten"
     verplicht: ["netbeheerder", "aansluiting"]
     trefwoorden: ["taak", "verzoek", "realiseren", "aansluiten", "aangeslotene"]
+    uitsluiten: ["tarief", "boete"]
     categorieen: [geen_ondertekend_contract, feitelijke_aansluiting_betwist, geen_verbruik]
     maximum: 4
 
@@ -255,6 +258,7 @@ artikelzoekers:
     doel: "De transporttaak en de verplichting transport aan te bieden"
     verplicht: ["netbeheerder", "transport"]
     trefwoorden: ["taak", "aanbieden", "uitvoeren", "verzoek", "aangeslotene"]
+    uitsluiten: ["tarief"]
     categorieen: [geen_verbruik, leegstand_of_sloop]
     maximum: 4
 

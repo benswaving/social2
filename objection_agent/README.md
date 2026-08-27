@@ -99,6 +99,7 @@ sudo apt install tesseract-ocr tesseract-ocr-nld poppler-utils
 .venv/bin/python -m app.knowledge.sync seed             # vindplaatsen inladen (offline)
 .venv/bin/python -m app.knowledge.sync wetten           # BW- en Awb-artikelen ophalen
 .venv/bin/python -m app.knowledge.sync artikelen        # Energiewet en ACM-codes: nummers laten opzoeken
+.venv/bin/python -m app.knowledge.sync artikelen --droogloop   # alleen het zoekplan tonen, zonder netwerk
 .venv/bin/python -m app.knowledge.sync jurisprudentie   # kandidaat-uitspraken oogsten
 .venv/bin/python -m app.knowledge.sync ecli ECLI:NL:HR:2024:123 --categorie verjaring --accorderen
 .venv/bin/python -m app.knowledge.sync status           # wat is citeerbaar
@@ -112,7 +113,18 @@ Losse hulpmiddelen:
 
 # BWB-id van een regeling opzoeken waarvan het nummer nog niet in de seed staat
 .venv/bin/python -m app.knowledge.sync resolve-bwb "Aansluit- en transportcode elektriciteit"
+
+# Zoeken in een handmatig gedownload BWB-XML, voor omgevingen zonder uitgaand netwerk
+.venv/bin/python -m app.knowledge.sync artikelen --bestand energiewet.xml            # tonen
+.venv/bin/python -m app.knowledge.sync artikelen --bestand energiewet.xml --opslaan  # opnemen
 ```
+
+Een zoekopdracht kent drie soorten woorden: `verplicht` (moeten allemaal voorkomen),
+`uitsluiten` (mogen niet voorkomen) en `trefwoorden` (bepalen de rangschikking). Een
+artikel dat geen enkel trefwoord raakt valt af — anders komt bijvoorbeeld een
+tariefbepaling mee bij de aansluittaak, alleen omdat daar ook "netbeheerder" en
+"aansluiting" in staan. Zien de treffers er niet uit, stel dan de woorden bij en
+draai opnieuw; de zoekopdrachten staan in `wetsartikelen.yaml`.
 
 Deze wetten en regelingen staan met hun BWB-id in de seed en worden dus automatisch
 opgehaald:
@@ -159,7 +171,7 @@ productiemodus, en dossiers die zo zijn behandeld worden altijd geëscaleerd.
 .venv/bin/python -m pytest tests/ -q
 ```
 
-39 tests, volledig offline: geen API-sleutel en geen netwerk nodig. De artikelzoeker
+42 tests, volledig offline: geen API-sleutel en geen netwerk nodig. De artikelzoeker
 wordt getest tegen een lokaal BWB-fragment, zodat de logica controleerbaar is zonder
 toegang tot het repository.
 
@@ -207,5 +219,5 @@ app/
   ingest/        PDF/OCR, IMAP, intake
   api/           REST + server-rendered review-UI
   models.py      bezwaren, argumenten, bronnen, concepten, audit
-tests/           39 tests, offline
+tests/           42 tests, offline
 ```

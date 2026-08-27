@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import xml.etree.ElementTree as ET
 from datetime import date, datetime, timezone
 
 import httpx
@@ -23,7 +24,7 @@ from ..db import init_db, session_scope
 from ..models import Source, SourceKind, Verification
 from .loader import _as_date, load_jurisprudentieprofielen, load_wetsartikelen, seed_sources
 from .rechtspraak import RechtspraakClient
-from .wetten import WettenClient
+from .wetten import WettenClient, doorzoek, lees_artikelen
 
 
 def _now() -> datetime:
@@ -91,12 +92,26 @@ def cmd_wetten(args: argparse.Namespace) -> int:
 
 
 
+def _toon_treffer(zoeker_key: str, volgnummer: int, treffer, vindplaats: str) -> None:
+    fragment = " ".join(treffer.tekst.split())[:220]
+    print(f"      {volgnummer}. {vindplaats}")
+    if treffer.titel:
+        print(f"         kop: {treffer.titel}")
+    print(f"         {fragment}{'...' if len(treffer.tekst) > 220 else ''}")
+
+
 def cmd_artikelen(args: argparse.Namespace) -> int:
     """Laat de wettekst zelf de artikelnummers opleveren.
 
     Dit is de plek waar de Energiewet binnenkomt: niet als een lijst nummers uit
     iemands hoofd, maar als de artikelen die bij het opgehaalde BWB-document
     daadwerkelijk over het onderwerp blijken te gaan.
+
+    Drie draaistanden:
+      (standaard)   haalt de wet op bij het KOOP-repository
+      --droogloop   toont alleen wat er gezocht gaat worden, zonder netwerk
+      --bestand     zoekt in een lokaal opgeslagen BWB-XML, voor omgevingen
+                    zonder uitgaand netwerk
     """
     data = load_wetsartikelen()
     wetten = {w["afkorting"]: w for w in data.get("wetten", []) if w.get("afkorting")}
@@ -105,6 +120,61 @@ def cmd_artikelen(args: argparse.Namespace) -> int:
     if args.zoeker:
         zoekers = [z for z in zoekers if z["key"] in set(args.zoeker)]
 
+    # --- droogloop: het zoekplan, zonder een enkele netwerkaanroep ------
+    if args.droogloop:
+        print(f"Zoekplan ({len(zoekers)} zoekopdrachten), peildatum {peildatum or 'huidige versie'}:\n")
+        onbruikbaar = 0
+        for zoeker in zoekers:
+            wet = wetten.get(zoeker.get("wet") or "")
+            bwb = (wet or {}).get("bwb_id")
+            status = bwb or "GEEN BWB-ID -> wordt overgeslagen"
+            if not bwb:
+                onbruikbaar += 1
+            print(f"  {zoeker['key']}")
+            print(f"      wet          {zoeker.get('wet')} ({status})")
+            print(f"      doel         {zoeker.get('doel', '')}")
+            print(f"      verplicht    alle van: {', '.join(zoeker.get('verplicht') or [])}")
+            print(f"      rangschikt   {', '.join(zoeker.get('trefwoorden') or [])}")
+            if zoeker.get("uitsluiten"):
+                print(f"      uitsluiten   {', '.join(zoeker['uitsluiten'])}")
+            print(f"      categorieen  {', '.join(zoeker.get('categorieen') or [])}")
+            print(f"      max treffers {zoeker.get('maximum', 5)}\n")
+        print(f"{len(zoekers) - onbruikbaar} uitvoerbaar, {onbruikbaar} zonder BWB-id.")
+        print("Draai zonder --droogloop op een omgeving met internettoegang.")
+        return 0
+
+    # --- lokaal bestand: dezelfde zoeklogica, andere bron ----------------
+    if args.bestand:
+        wortel = ET.parse(args.bestand).getroot()
+        artikelen = lees_artikelen(wortel)
+        print(f"{len(artikelen)} artikelen gelezen uit {args.bestand}\n")
+        gevonden_totaal = 0
+        with session_scope() as session:
+            for zoeker in zoekers:
+                wet = wetten.get(zoeker.get("wet") or "") or {}
+                treffers = doorzoek(
+                    artikelen,
+                    list(zoeker.get("verplicht") or []),
+                    list(zoeker.get("trefwoorden") or []),
+                    uitsluiten=list(zoeker.get("uitsluiten") or []),
+                    maximum=int(zoeker.get("maximum", 5)),
+                )
+                print(f"  {zoeker['key']}: {len(treffers)} treffer(s)")
+                for volgnummer, treffer in enumerate(treffers, start=1):
+                    vindplaats = f"art. {treffer.nummer} {wet.get('naam', zoeker.get('wet'))}"
+                    _toon_treffer(zoeker["key"], volgnummer, treffer, vindplaats)
+                    if args.opslaan:
+                        _bewaar_treffer(session, zoeker, wet, treffer, vindplaats,
+                                        volgnummer, "lokaal bestand", None)
+                        gevonden_totaal += 1
+                print()
+        if args.opslaan:
+            print(f"{gevonden_totaal} artikelen opgenomen als `auto-gemapt`.")
+        else:
+            print("Alleen getoond. Gebruik --opslaan om ze in de kennisbank te zetten.")
+        return 0
+
+    # --- normale run: ophalen bij de officiele bron ----------------------
     toegevoegd = 0
     with WettenClient() as client, session_scope() as session:
         for zoeker in zoekers:
@@ -121,50 +191,76 @@ def cmd_artikelen(args: argparse.Namespace) -> int:
                     wet["bwb_id"],
                     verplicht=list(zoeker.get("verplicht") or []),
                     trefwoorden=list(zoeker.get("trefwoorden") or []),
+                    uitsluiten=list(zoeker.get("uitsluiten") or []),
                     peildatum=peildatum,
                     maximum=int(zoeker.get("maximum", 5)),
                 )
             except httpx.HTTPError as exc:
-                print(f"  ! {zoeker['key']}: netwerkfout ({exc.__class__.__name__})", file=sys.stderr)
+                print(f"  ! {zoeker['key']}: netwerkfout ({exc.__class__.__name__}: {exc})", file=sys.stderr)
                 continue
 
             if not treffers:
                 print(f"  x {zoeker['key']}: geen artikel gevonden dat aan de eisen voldoet")
                 continue
 
-            print(f"  v {zoeker['key']}: {', '.join(t.artikel for t in treffers)}")
+            print(f"  v {zoeker['key']}: {len(treffers)} treffer(s)")
             for volgnummer, treffer in enumerate(treffers, start=1):
-                key = f"{zoeker['key']}-{treffer.artikel.replace(' ', '')}"
-                bron = session.scalar(select(Source).where(Source.key == key))
-                if bron is None:
-                    bron = Source(key=key, soort=SourceKind.WET, toegevoegd_door="sync")
-                    session.add(bron)
-                    toegevoegd += 1
-                bron.titel = treffer.titel[:500]
-                bron.vindplaats = f"art. {treffer.artikel} {wet['naam']}"
-                bron.tekst = treffer.tekst
-                bron.samenvatting = zoeker.get("doel")
-                bron.url = treffer.url
-                bron.geldig_vanaf = _as_date(wet.get("geldig_vanaf"))
-                bron.geldig_tot = _as_date(wet.get("geldig_tot"))
-                bron.vervangen_door = wet.get("vervangen_door")
-                bron.categorieen = list(zoeker.get("categorieen") or [])
-                # De tekst is echt en geverifieerd. Of dit artikel bij deze
-                # bezwaarcategorie hoort, is een keuze van de zoekopdracht - en die
-                # beoordeelt een jurist voordat de agent ermee argumenteert.
-                bron.verificatie = Verification.BEVESTIGD
-                bron.verificatie_toelichting = (
-                    f"Automatisch gevonden in {wet['bwb_id']} (versie {treffer.versiedatum}), "
-                    f"treffer {volgnummer} voor zoekopdracht '{zoeker['key']}'. "
-                    "Tekst geverifieerd; koppeling aan de categorie nog te accorderen."
+                vindplaats = f"art. {treffer.artikel} {wet['naam']}"
+                _toon_treffer(zoeker["key"], volgnummer, treffer, vindplaats)
+                _bewaar_treffer(
+                    session, zoeker, wet, treffer, vindplaats, volgnummer,
+                    wet["bwb_id"], treffer.versiedatum, url=treffer.url,
                 )
-                bron.tags = ["auto-gemapt", zoeker["key"]]
-                bron.laatst_gecontroleerd = _now()
+                toegevoegd += 1
+            print()
 
-    print(f"\n{toegevoegd} nieuwe artikelen opgenomen.")
+    if not toegevoegd:
+        print("Geen artikelen opgenomen.")
+        return 1
+    print(f"{toegevoegd} artikelen opgenomen.")
     print("Deze staan als `auto-gemapt` in de kennisbank en zijn nog niet citeerbaar.")
     print("Loop ze na op /kennisbank en accordeer wat klopt.")
     return 0
+
+
+def _bewaar_treffer(
+    session,
+    zoeker: dict,
+    wet: dict,
+    treffer,
+    vindplaats: str,
+    volgnummer: int,
+    herkomst: str,
+    versiedatum: str | None,
+    url: str | None = None,
+) -> None:
+    nummer = getattr(treffer, "artikel", None) or treffer.nummer
+    key = f"{zoeker['key']}-{nummer.replace(' ', '')}"
+    bron = session.scalar(select(Source).where(Source.key == key))
+    if bron is None:
+        bron = Source(key=key, soort=SourceKind.WET, toegevoegd_door="sync")
+        session.add(bron)
+    bron.titel = (treffer.titel or vindplaats)[:500]
+    bron.vindplaats = vindplaats
+    bron.tekst = treffer.tekst
+    bron.samenvatting = zoeker.get("doel")
+    bron.url = url
+    bron.geldig_vanaf = _as_date(wet.get("geldig_vanaf"))
+    bron.geldig_tot = _as_date(wet.get("geldig_tot"))
+    bron.vervangen_door = wet.get("vervangen_door")
+    bron.categorieen = list(zoeker.get("categorieen") or [])
+    # De tekst is echt en geverifieerd. Of dit artikel bij deze bezwaarcategorie
+    # hoort, is een keuze van de zoekopdracht - en die beoordeelt een jurist
+    # voordat de agent ermee argumenteert.
+    bron.verificatie = Verification.BEVESTIGD
+    bron.verificatie_toelichting = (
+        f"Automatisch gevonden in {herkomst}"
+        + (f" (versie {versiedatum})" if versiedatum else "")
+        + f", treffer {volgnummer} voor zoekopdracht '{zoeker['key']}'. "
+        "Tekst geverifieerd; koppeling aan de categorie nog te accorderen."
+    )
+    bron.tags = ["auto-gemapt", zoeker["key"]]
+    bron.laatst_gecontroleerd = _now()
 
 
 def cmd_wet_volledig(args: argparse.Namespace) -> int:
@@ -339,6 +435,9 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("artikelen", help="artikelnummers laten opzoeken in de wettekst")
     p.add_argument("--peildatum", help="YYYY-MM-DD; welke wetsversie moet gelden")
     p.add_argument("--zoeker", action="append", help="beperk tot deze zoekopdracht(en)")
+    p.add_argument("--droogloop", action="store_true", help="toon alleen het zoekplan, zonder netwerk")
+    p.add_argument("--bestand", help="zoek in een lokaal opgeslagen BWB-XML in plaats van online")
+    p.add_argument("--opslaan", action="store_true", help="bij --bestand: treffers ook wegschrijven")
     p.set_defaults(func=cmd_artikelen)
 
     p = sub.add_parser("wet-volledig", help="een hele wet doorzoekbaar inladen")

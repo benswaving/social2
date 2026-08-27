@@ -86,22 +86,36 @@ def doorzoek(
     verplicht: list[str],
     trefwoorden: list[str],
     *,
+    uitsluiten: list[str] | None = None,
     maximum: int = 5,
+    minimale_score: int = 1,
 ) -> list[RuwArtikel]:
     """Rangschikt artikelen op onderwerp.
 
-    Elk woord uit `verplicht` moet voorkomen; `trefwoorden` bepalen de volgorde.
+    Elk woord uit `verplicht` moet voorkomen, geen enkel woord uit `uitsluiten`, en
+    `trefwoorden` bepalen de volgorde. Een artikel dat geen enkel trefwoord raakt
+    haalt de drempel niet: dat is meestal een artikel dat toevallig dezelfde
+    begrippen noemt, zoals een tariefbepaling die 'netbeheerder' en 'aansluiting'
+    bevat maar niet over de aansluittaak gaat.
+
     Bewust simpel en deterministisch: de uitkomst moet voor een jurist na te lopen
     zijn, en een artikel dat hier bovenaan komt is nog steeds een voorstel.
     """
+    uitsluiten = uitsluiten or []
     gescoord: list[tuple[int, int, RuwArtikel]] = []
     for artikel in artikelen:
         inhoud = f"{artikel.titel} {artikel.tekst}".lower()
         if not all(woord.lower() in inhoud for woord in verplicht):
             continue
+        if any(woord.lower() in inhoud for woord in uitsluiten):
+            continue
         score = sum(inhoud.count(woord.lower()) for woord in trefwoorden)
-        in_kop = sum(3 for woord in trefwoorden if woord.lower() in artikel.titel.lower())
-        gescoord.append((score + in_kop, -len(artikel.tekst), artikel))
+        # Een treffer in de kop van het artikel zegt meer dan een losse vermelding
+        # ergens in een lid.
+        score += sum(3 for woord in trefwoorden if woord.lower() in artikel.titel.lower())
+        if score < minimale_score:
+            continue
+        gescoord.append((score, -len(artikel.tekst), artikel))
 
     gescoord.sort(key=lambda rij: (rij[0], rij[1]), reverse=True)
     return [artikel for _, _, artikel in gescoord[:maximum]]
@@ -176,6 +190,7 @@ class WettenClient:
         *,
         verplicht: list[str],
         trefwoorden: list[str],
+        uitsluiten: list[str] | None = None,
         peildatum: date | None = None,
         maximum: int = 5,
     ) -> list[Wetsartikel]:
@@ -188,7 +203,13 @@ class WettenClient:
         if versie is None:
             return []
         wortel = self.haal_document(bwb_id, versie)
-        treffers = doorzoek(lees_artikelen(wortel), verplicht, trefwoorden, maximum=maximum)
+        treffers = doorzoek(
+            lees_artikelen(wortel),
+            verplicht,
+            trefwoorden,
+            uitsluiten=uitsluiten,
+            maximum=maximum,
+        )
         return [_naar_wetsartikel(t, bwb_id, versie) for t in treffers]
 
     def alle_artikelen(
