@@ -8,25 +8,86 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from ..agent.pipeline import verwerk_bezwaar
 from ..db import get_session
 from ..ingest.intake import uit_tekst
-from ..models import AuditEvent, CaseStatus, Draft, Objection, Source, Verification
+from ..models import AuditEvent, CaseStatus, Draft, Merit, Objection, Source, Verification
 
 router = APIRouter(tags=["ui"], include_in_schema=False)
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent.parent / "templates"))
 
 
 @router.get("/", response_class=HTMLResponse)
-def werkvoorraad(request: Request, session: Session = Depends(get_session)) -> HTMLResponse:
-    bezwaren = list(
-        session.scalars(select(Objection).order_by(Objection.ontvangen_op.desc()).limit(100))
-    )
+def werkvoorraad(
+    request: Request,
+    status: str = "",
+    kans: str = "",
+    escalatie: str = "",
+    zoek: str = "",
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
+    stmt = select(Objection).order_by(Objection.ontvangen_op.desc())
+
+    if status:
+        try:
+            stmt = stmt.where(Objection.status == CaseStatus(status))
+        except ValueError:
+            pass
+    if kans:
+        try:
+            stmt = stmt.where(Objection.globale_kans == Merit(kans))
+        except ValueError:
+            pass
+    if escalatie == "ja":
+        stmt = stmt.where(Objection.escalatie.is_(True))
+    elif escalatie == "nee":
+        stmt = stmt.where(Objection.escalatie.is_(False))
+    if zoek:
+        naald = f"%{zoek.strip()}%"
+        stmt = stmt.where(
+            or_(
+                Objection.dossier_ref.ilike(naald),
+                Objection.ean.ilike(naald),
+                Objection.afzender_naam.ilike(naald),
+                Objection.afzender_email.ilike(naald),
+            )
+        )
+
+    bezwaren = list(session.scalars(stmt.limit(200)))
+
+    # Tellingen over de hele voorraad, niet over de filterselectie: een medewerker
+    # wil zien hoeveel er nog open staat, niet hoeveel er in beeld is.
+    tellingen = {
+        "totaal": session.scalar(select(func.count()).select_from(Objection)) or 0,
+        "escalatie": session.scalar(
+            select(func.count()).select_from(Objection).where(Objection.escalatie.is_(True))
+        )
+        or 0,
+        "open": session.scalar(
+            select(func.count())
+            .select_from(Objection)
+            .where(Objection.status.notin_([CaseStatus.GOEDGEKEURD, CaseStatus.VERZONDEN]))
+        )
+        or 0,
+        "mislukt": session.scalar(
+            select(func.count()).select_from(Objection).where(Objection.status == CaseStatus.MISLUKT)
+        )
+        or 0,
+    }
+
     return templates.TemplateResponse(
-        request=request, name="werkvoorraad.html", context={"bezwaren": bezwaren}
+        request=request,
+        name="werkvoorraad.html",
+        context={
+            "bezwaren": bezwaren,
+            "tellingen": tellingen,
+            "filters": {"status": status, "kans": kans, "escalatie": escalatie, "zoek": zoek},
+            "statussen": [s.value for s in CaseStatus],
+            "kansen": [m.value for m in Merit],
+        },
     )
 
 

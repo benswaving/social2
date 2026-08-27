@@ -1,6 +1,35 @@
 {% extends "basis.html" %}
 {% block inhoud %}
-<h2 style="margin-top:0">Werkvoorraad ({{ bezwaren|length }})</h2>
+<h2 style="margin-top:0">Werkvoorraad</h2>
+<p class="gedempt" style="margin-top:-8px">
+  {{ tellingen.open }} open &middot; {{ tellingen.escalatie }} naar een mens &middot;
+  {{ tellingen.mislukt }} mislukt &middot; {{ tellingen.totaal }} totaal
+</p>
+
+<form method="get" action="/" class="paneel" style="margin-bottom:16px; display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end">
+  <label class="gedempt">Zoek op kenmerk, EAN of naam<br>
+    <input type="text" name="zoek" value="{{ filters.zoek }}" placeholder="ASC-2024-... / 8716... / naam" style="width:260px"></label>
+  <label class="gedempt">Status<br>
+    <select name="status">
+      <option value="">alle</option>
+      {% for s in statussen %}<option value="{{ s }}" {% if filters.status == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+    </select></label>
+  <label class="gedempt">Kans<br>
+    <select name="kans">
+      <option value="">alle</option>
+      {% for k in kansen %}<option value="{{ k }}" {% if filters.kans == k %}selected{% endif %}>{{ k }}</option>{% endfor %}
+    </select></label>
+  <label class="gedempt">Escalatie<br>
+    <select name="escalatie">
+      <option value="">alle</option>
+      <option value="ja" {% if filters.escalatie == "ja" %}selected{% endif %}>alleen naar een mens</option>
+      <option value="nee" {% if filters.escalatie == "nee" %}selected{% endif %}>zonder escalatie</option>
+    </select></label>
+  <button type="submit">Filteren</button>
+  <a href="/" class="gedempt" style="padding-bottom:8px">wissen</a>
+</form>
+
+<p class="gedempt">{{ bezwaren|length }} dossier(s) in beeld</p>
 
 <form method="post" action="/ui/tekst" class="paneel" style="margin-bottom:22px">
   <h2>Bezwaar plakken</h2>
@@ -10,7 +39,8 @@
 </form>
 
 {% if not bezwaren %}
-  <p class="gedempt">Nog geen bezwaren. Plak er een hierboven, upload een PDF of haal de postbus op.</p>
+  <p class="gedempt">Geen dossiers gevonden. Wis de filters, plak een bezwaar hierboven,
+    upload een PDF of haal de postbus op.</p>
 {% else %}
 <table>
   <tr><th>#</th><th>Afzender</th><th>Kenmerk</th><th>Status</th><th>Kans</th>

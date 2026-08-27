@@ -10,6 +10,7 @@ _TMP = Path(tempfile.mkdtemp(prefix="asc-agent-tests-"))
 # Moet gezet zijn vóór app.config voor het eerst geimporteerd wordt.
 os.environ["OA_DATABASE_URL"] = f"sqlite:///{_TMP / 'test.db'}"
 os.environ["OA_LLM_PROVIDER"] = "offline"
+os.environ["OA_REQUIRE_AUTH"] = "false"
 os.environ.pop("OA_OPENAI_API_KEY", None)
 
 import pytest  # noqa: E402

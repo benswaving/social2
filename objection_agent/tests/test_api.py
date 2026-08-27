@@ -165,3 +165,70 @@ def test_auto_gemapt_artikel_accorderen_via_de_ui(client):
     bron = client.get("/api/kennisbank/bronnen").json()
     gemapt = next(b for b in bron if b["key"] == "ew-aansluittaak-3.10")
     assert gemapt["citeerbaar"] is True
+
+
+def test_brief_kan_pas_worden_uitgevoerd_na_goedkeuring(client):
+    bezwaar = client.post("/api/bezwaren/tekst", json={"tekst": BRIEF}).json()
+    concept = bezwaar["concepten"][-1]
+    pad = f"/api/bezwaren/{bezwaar['id']}/concepten/{concept['id']}/brief.txt"
+
+    assert client.get(pad).status_code == 409
+
+    client.post(
+        f"/api/bezwaren/{bezwaar['id']}/concepten/{concept['id']}/goedkeuren",
+        json={"beoordelaar": "medewerker-042", "aangepaste_tekst": "Geachte heer,\n\nHierbij."},
+    )
+    uitvoer = client.get(pad)
+    assert uitvoer.status_code == 200
+    assert "Hierbij" in uitvoer.text
+    assert "attachment" in uitvoer.headers["content-disposition"]
+
+
+def test_dossier_verwijderen_laat_een_spoor_zonder_inhoud(client):
+    bezwaar = client.post("/api/bezwaren/tekst", json={"tekst": BRIEF}).json()
+
+    weg = client.delete(f"/api/bezwaren/{bezwaar['id']}?actor=fg-01&reden=avg-verzoek")
+    assert weg.status_code == 204
+    assert client.get(f"/api/bezwaren/{bezwaar['id']}").status_code == 404
+
+    from app.db import SessionLocal
+    from app.models import AuditEvent
+
+    with SessionLocal() as s:
+        spoor = s.query(AuditEvent).filter_by(actie="dossier_verwijderd").one()
+        assert spoor.actor == "fg-01"
+        assert spoor.detail["reden"] == "avg-verzoek"
+        assert "ruwe_tekst" not in spoor.detail
+        assert "afzender_naam" not in spoor.detail
+
+
+def test_dezelfde_brief_levert_geen_tweede_dossier(client):
+    eerste = client.post("/api/bezwaren/tekst", json={"tekst": BRIEF})
+    tweede = client.post("/api/bezwaren/tekst", json={"tekst": BRIEF})
+    assert eerste.status_code == 201
+    assert tweede.status_code == 200
+    assert tweede.json()["id"] == eerste.json()["id"]
+
+
+def test_werkvoorraad_kan_gefilterd_worden(client):
+    client.post("/api/bezwaren/tekst", json={"tekst": BRIEF})
+    client.post(
+        "/api/bezwaren/tekst",
+        json={
+            "tekst": "Ik heb het pand op 04-06-2021 verkocht bij de notaris en ben geen "
+            "eigenaar meer. Kenmerk ASC-2021-777.",
+        },
+    )
+
+    alles = client.get("/")
+    assert alles.status_code == 200
+
+    op_kenmerk = client.get("/?zoek=ASC-2021-777")
+    assert "ASC-2021-777" in op_kenmerk.text
+    assert "ASC-2024-88123" not in op_kenmerk.text
+
+    op_kans = client.get("/?kans=kansrijk")
+    assert op_kans.status_code == 200
+
+    zonder_treffer = client.get("/?zoek=bestaat-niet-xyz")
+    assert "Geen dossiers gevonden" in zonder_treffer.text

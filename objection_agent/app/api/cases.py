@@ -5,7 +5,8 @@ from __future__ import annotations
 import hashlib
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile
+from fastapi.responses import PlainTextResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -50,8 +51,14 @@ def detail(bezwaar_id: int, session: Session = Depends(get_session)) -> Objectio
 
 
 @router.post("/tekst", response_model=BezwaarDetail, status_code=201)
-def via_tekst(payload: TekstIn, session: Session = Depends(get_session)) -> Objection:
+def via_tekst(
+    payload: TekstIn, response: Response, session: Session = Depends(get_session)
+) -> Objection:
     objection = uit_tekst(session, payload.tekst, afzender_naam=payload.afzender_naam)
+    if objection.concepten:
+        # Deze brief was al bekend; geen nieuw dossier en dus geen 201.
+        response.status_code = 200
+        return objection
     if payload.direct_verwerken:
         verwerk_bezwaar(session, objection)
         session.refresh(objection)
@@ -60,6 +67,7 @@ def via_tekst(payload: TekstIn, session: Session = Depends(get_session)) -> Obje
 
 @router.post("/upload", response_model=BezwaarDetail, status_code=201)
 async def via_upload(
+    response: Response,
     bestand: UploadFile = File(...),
     session: Session = Depends(get_session),
 ) -> Objection:
@@ -80,6 +88,9 @@ async def via_upload(
     doel.write_bytes(inhoud)
 
     objection = uit_bestand(session, doel, kanaal="upload", bron_id=f"bestand:{digest}")
+    if objection.concepten:
+        response.status_code = 200  # al eerder ingelezen
+        return objection
     if objection.status == CaseStatus.NIEUW:
         verwerk_bezwaar(session, objection)
         session.refresh(objection)
@@ -145,3 +156,56 @@ def goedkeuren(
     session.commit()
     session.refresh(draft)
     return draft
+
+
+@router.get("/{bezwaar_id}/concepten/{concept_id}/brief.txt", response_class=PlainTextResponse)
+def brief_uitvoeren(
+    bezwaar_id: int, concept_id: int, session: Session = Depends(get_session)
+) -> PlainTextResponse:
+    """De brieftekst als bestand, om in het zaaksysteem of de post te zetten.
+
+    Alleen na goedkeuring: een concept dat nog niemand heeft gezien hoort niet
+    per ongeluk in een uitgaande map te belanden.
+    """
+    objection = _haal(session, bezwaar_id)
+    draft = session.get(Draft, concept_id)
+    if draft is None or draft.objection_id != objection.id:
+        raise HTTPException(status_code=404, detail="Concept niet gevonden")
+    if draft.goedgekeurd_op is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Dit concept is nog niet goedgekeurd en kan niet worden uitgevoerd.",
+        )
+
+    kenmerk = objection.dossier_ref or objection.ean or f"dossier-{objection.id}"
+    return PlainTextResponse(
+        draft.tekst,
+        headers={
+            "Content-Disposition": f'attachment; filename="antwoord-{kenmerk}.txt"',
+        },
+    )
+
+
+@router.delete("/{bezwaar_id}", status_code=204)
+def verwijderen(
+    bezwaar_id: int,
+    actor: str = Query(..., description="wie verwijdert dit, voor het audittrail"),
+    reden: str = Query(default="verzoek betrokkene"),
+    session: Session = Depends(get_session),
+) -> Response:
+    """Verwijdert een dossier met alles eraan vast.
+
+    Nodig voor een verwijderingsverzoek onder de AVG. Er blijft een spoor achter
+    dat er is verwijderd, zonder de inhoud te bewaren.
+    """
+    objection = _haal(session, bezwaar_id)
+    spoor = {
+        "dossier_ref": objection.dossier_ref,
+        "ontvangen_op": objection.ontvangen_op.isoformat(),
+        "status": objection.status.value,
+        "reden": reden,
+    }
+    session.delete(objection)
+    session.add(AuditEvent(objection_id=None, actor=actor, actie="dossier_verwijderd", detail=spoor))
+    session.commit()
+    return Response(status_code=204)

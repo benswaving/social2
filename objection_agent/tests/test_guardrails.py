@@ -148,3 +148,44 @@ def test_echt_overgeslagen_argument_wordt_nog_steeds_gemeld():
         argumenten=[_Volledig(1, "De vordering is verjaard", standpunt="Verjaring van periodieke betalingen")],
     )
     assert "argument_niet_behandeld" in _codes(rapport)
+
+
+class _Beoordeeld:
+    def __init__(self, merit, merit_score, stelling="", volgnummer=1):
+        self.merit = merit
+        self.merit_score = merit_score
+        self.stelling = stelling
+        self.volgnummer = volgnummer
+
+
+def test_blokkeert_toezegging_die_de_beoordeling_niet_draagt():
+    """Vangt zowel een model dat te ver meegaat als sturing vanuit de brief zelf."""
+    rapport = controleer_concept(
+        "Geachte heer,\n\nWij trekken de vordering in en u bent niets meer verschuldigd.",
+        toegestane_vindplaatsen=set(),
+        brontekst="",
+        argumenten=[_Beoordeeld("kansarm", 0.05, "Ik heb nooit getekend")],
+    )
+    assert rapport.geblokkeerd
+    assert "ongedekte_toezegging" in _codes(rapport)
+
+
+def test_toezegging_mag_wel_bij_een_kansrijk_argument():
+    rapport = controleer_concept(
+        "Geachte heer,\n\nU heeft gelijk: wij trekken de vordering in over de periode na de "
+        "overdracht.",
+        toegestane_vindplaatsen=set(),
+        brontekst="",
+        argumenten=[_Beoordeeld("kansrijk", 0.7, "Ik ben niet meer de eigenaar")],
+    )
+    assert "ongedekte_toezegging" not in _codes(rapport)
+
+
+def test_gewone_afwijzing_raakt_de_toezeggingscontrole_niet():
+    rapport = controleer_concept(
+        "Wij handhaven de vordering. U kunt binnen veertien dagen reageren.",
+        toegestane_vindplaatsen=set(),
+        brontekst="",
+        argumenten=[_Beoordeeld("kansarm", 0.1, "Ik heb nooit getekend")],
+    )
+    assert not rapport.geblokkeerd

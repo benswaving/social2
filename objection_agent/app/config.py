@@ -50,6 +50,18 @@ class Settings(BaseSettings):
     imap_processed_folder: str = "Verwerkt"
     imap_max_per_run: int = 50
 
+    # --- Toegang --------------------------------------------------------
+    # De applicatie start niet zonder een van beide, tenzij require_auth uit staat.
+    require_auth: bool = True
+    ui_user: str | None = None
+    ui_password: str | None = None
+    auth_token: str | None = None
+
+    # --- Bewaartermijn --------------------------------------------------
+    # Na deze termijn mag een afgehandeld dossier worden opgeruimd. Stem af met
+    # de functionaris gegevensbescherming; nul betekent: niet automatisch opruimen.
+    bewaartermijn_dagen: int = 730
+
     # --- Beleid / veiligheidskleppen ------------------------------------
     # De agent verstuurt nooit zelf. Deze vlag bestaat om dat expliciet te maken.
     autosend_enabled: bool = False

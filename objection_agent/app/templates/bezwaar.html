@@ -111,7 +111,10 @@
 
       {% if concept.goedgekeurd_op %}
       <p class="melding kansrijk"><strong>Goedgekeurd</strong>
-        door {{ concept.beoordelaar }} op {{ concept.goedgekeurd_op.strftime("%d-%m-%Y %H:%M") }}</p>
+        door {{ concept.beoordelaar }} op {{ concept.goedgekeurd_op.strftime("%d-%m-%Y %H:%M") }}
+        &middot;
+        <a href="/api/bezwaren/{{ b.id }}/concepten/{{ concept.id }}/brief.txt">brief downloaden</a>
+      </p>
       {% endif %}
     {% endif %}
   </div>
