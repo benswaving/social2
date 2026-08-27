@@ -120,3 +120,55 @@ def test_peildatum_bepaalt_welk_recht_geldt(session):
 
     analyse = analyseer_met_regels("De vordering ziet op de periode vanaf 12-03-2022.")
     assert analyse.peildatum == date(2022, 3, 12)
+
+
+def test_automatisch_gemapt_artikel_is_nog_niet_citeerbaar(session):
+    """Een opgehaalde wettekst is echt; de koppeling aan een categorie is een oordeel."""
+    from app.knowledge.store import haal_bronnen
+
+    session.add(
+        Source(
+            key="ew-aansluittaak-3.10",
+            soort=SourceKind.WET,
+            titel="Taak netbeheerder",
+            vindplaats="art. 3.10 Energiewet",
+            tekst="De netbeheerder heeft tot taak ...",
+            categorieen=["geen_ondertekend_contract"],
+            verificatie=Verification.BEVESTIGD,
+            tags=["auto-gemapt", "ew-aansluittaak"],
+        )
+    )
+    session.commit()
+
+    bron = session.query(Source).filter_by(key="ew-aansluittaak-3.10").one()
+    assert bron.citeerbaar is False
+    assert haal_bronnen(session, ["geen_ondertekend_contract"]) == []
+
+    # Na accordering door een jurist wel.
+    bron.verificatie = Verification.HANDMATIG
+    session.commit()
+    assert bron.citeerbaar is True
+    assert [b.key for b in haal_bronnen(session, ["geen_ondertekend_contract"])] == [
+        "ew-aansluittaak-3.10"
+    ]
+
+
+def test_energiewet_geldt_niet_voor_een_oude_vordering(session):
+    """Een vordering uit 2023 valt nog onder de Elektriciteitswet 1998."""
+    from datetime import date as _date
+
+    from app.knowledge.store import geldig_op
+
+    energiewet = Source(
+        key="ew-x", soort=SourceKind.WET, titel="t", vindplaats="art. 3.10 Energiewet",
+        geldig_vanaf=_date(2026, 1, 1), verificatie=Verification.HANDMATIG,
+    )
+    ewet1998 = Source(
+        key="ewet-x", soort=SourceKind.WET, titel="t", vindplaats="art. 23 Elektriciteitswet 1998",
+        geldig_tot=_date(2025, 12, 31), vervangen_door="Ew", verificatie=Verification.HANDMATIG,
+    )
+
+    assert geldig_op(energiewet, _date(2023, 5, 1)) is False
+    assert geldig_op(ewet1998, _date(2023, 5, 1)) is True
+    assert geldig_op(energiewet, _date(2026, 3, 1)) is True
+    assert geldig_op(ewet1998, _date(2026, 3, 1)) is False

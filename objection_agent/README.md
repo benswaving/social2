@@ -37,11 +37,23 @@ daar niet blijkt te bestaan komt op `niet_gevonden` en wordt nooit meer geciteer
 ook niet als het model erop staat. Zo kan de agent niet hetzelfde doen als de
 brieven die hij beoordeelt.
 
-**Er staat geen enkel ECLI-nummer in de seed.** Uit het hoofd opgeschreven
+**Er staat geen enkel ECLI-nummer én geen enkel Energiewet-artikelnummer in de seed.** Uit het hoofd opgeschreven
 jurisprudentie is precies de fout die we bestrijden. In plaats daarvan staan er
 zoekprofielen in `jurisprudentie.yaml`; `sync jurisprudentie` haalt daarmee echte
-uitspraken op met hun echte tekst. Die komen binnen als *kandidaat* en worden pas
-citeerbaar nadat een jurist ze heeft geaccordeerd.
+uitspraken op met hun echte tekst.
+
+Voor de wet werkt het net zo. `wetsartikelen.yaml` bevat geen artikelnummers voor
+de Energiewet maar *artikelzoekers*: "zoek in BWBR0050714 de artikelen waarin zowel
+`netbeheerder` als `aansluiting` voorkomt, en rangschik op `taak`, `verzoek`,
+`realiseren`". `sync artikelen` haalt de wet op, doorzoekt de artikelen en slaat op
+wat er echt in staat — met het echte nummer, de echte tekst en de versiedatum. Het
+artikelnummer komt dus uit de wet, niet uit een geheugen.
+
+Wat zo binnenkomt is *geverifieerd van tekst* maar *niet geaccordeerd van
+toepassing*: de zoekopdracht koppelt het artikel aan een bezwaarcategorie, en dat
+is een juridisch oordeel. Zulke bronnen krijgen de tag `auto-gemapt` en zijn niet
+citeerbaar tot een jurist ze op `/kennisbank` heeft vrijgegeven. Hetzelfde geldt
+voor de kandidaat-uitspraken.
 
 **"Bestaat niet" zeggen we alleen als we het echt hebben opgezocht.** Kon een
 verwijzing niet gecontroleerd worden, dan blijft de uitkomst `onbekend` en zwijgt
@@ -85,15 +97,48 @@ sudo apt install tesseract-ocr tesseract-ocr-nld poppler-utils
 
 ```bash
 .venv/bin/python -m app.knowledge.sync seed             # vindplaatsen inladen (offline)
-.venv/bin/python -m app.knowledge.sync wetten           # wetteksten ophalen en verifieren
+.venv/bin/python -m app.knowledge.sync wetten           # BW- en Awb-artikelen ophalen
+.venv/bin/python -m app.knowledge.sync artikelen        # Energiewet en ACM-codes: nummers laten opzoeken
 .venv/bin/python -m app.knowledge.sync jurisprudentie   # kandidaat-uitspraken oogsten
 .venv/bin/python -m app.knowledge.sync ecli ECLI:NL:HR:2024:123 --categorie verjaring --accorderen
 .venv/bin/python -m app.knowledge.sync status           # wat is citeerbaar
 ```
 
-Eigen materiaal — werkinstructies, standaardparagrafen, de ACM-codebesluiten —
-gaat erin via `POST /api/kennisbank/bronnen`. Zolang `geaccordeerd` niet is gezet,
-is het zichtbaar voor de medewerker maar niet citeerbaar.
+Losse hulpmiddelen:
+
+```bash
+# Hele wet doorzoekbaar inladen (zonder categorieën, dus alleen om op te zoeken)
+.venv/bin/python -m app.knowledge.sync wet-volledig BWBR0050714 --naam Energiewet
+
+# BWB-id van een regeling opzoeken waarvan het nummer nog niet in de seed staat
+.venv/bin/python -m app.knowledge.sync resolve-bwb "Aansluit- en transportcode elektriciteit"
+```
+
+Deze wetten en regelingen staan met hun BWB-id in de seed en worden dus automatisch
+opgehaald:
+
+| Regeling | BWB-id | Geldig |
+|---|---|---|
+| Energiewet | BWBR0050714 | vanaf 01-01-2026 |
+| Elektriciteitswet 1998 | BWBR0009755 | t/m 31-12-2025 |
+| Gaswet | BWBR0011440 | t/m 31-12-2025 |
+| Tarievencode elektriciteit 2026 | BWBR0052321 | vanaf 01-01-2026 |
+| Begrippencode elektriciteit 2026 | BWBR0052320 | vanaf 01-01-2026 |
+| Systeemcode elektriciteit 2026 | BWBR0052336 | vanaf 01-01-2026 |
+| Aansluit- en transportcode gas DSB | BWBR0052332 | vanaf 01-01-2026 |
+| Energieregeling | BWBR0051774 | vanaf 01-01-2026 |
+| BW Boeken 3, 5 en 6 | BWBR0005291 / 0005288 / 0005289 | — |
+| Algemene wet bestuursrecht | BWBR0005537 | — |
+
+Sinds de Energiewet staan de ACM-codebesluiten in het BWB, en zijn ze dus langs
+dezelfde weg op te halen en te verifiëren als de wet zelf. Dat scheelt jullie het
+handmatig aanleveren ervan. Het BWB-id van de Aansluit- en transportcode
+*elektriciteit* heb ik niet kunnen vaststellen; `resolve-bwb` zoekt dat op.
+
+Wat overblijft om zelf aan te leveren via `POST /api/kennisbank/bronnen`: de interne
+werkinstructie, de vastgestelde standaardparagrafen, en verder materiaal dat niet
+openbaar gepubliceerd is. Zolang `geaccordeerd` niet is gezet, is het zichtbaar voor
+de medewerker maar niet citeerbaar.
 
 ## Draaien
 
@@ -114,19 +159,24 @@ productiemodus, en dossiers die zo zijn behandeld worden altijd geëscaleerd.
 .venv/bin/python -m pytest tests/ -q
 ```
 
-26 tests, volledig offline: geen API-sleutel en geen netwerk nodig.
+39 tests, volledig offline: geen API-sleutel en geen netwerk nodig. De artikelzoeker
+wordt getest tegen een lokaal BWB-fragment, zodat de logica controleerbaar is zonder
+toegang tot het repository.
 
 ## Wat nog moet gebeuren voordat dit live kan
 
 Dit is een werkend systeem, geen afgeronde implementatie. Openstaande punten:
 
-1. **De Energiewet-artikelen moeten ingevuld.** Sinds 1 januari 2026 vervangt de
-   Energiewet de Elektriciteitswet 1998 en de Gaswet. Het BWB-id staat nog op
-   `null` in `wetsartikelen.yaml`, en de drie artikelen die de aansluit- en
-   transporttaak dragen — het hart van elk ASC-dossier — moeten door een jurist
-   worden aangewezen. Tot dat gebeurt zijn ze niet citeerbaar en valt de agent
-   terug op het Burgerlijk Wetboek. Vorderingen over periodes vóór 2026 vallen nog
-   onder het oude recht; het datamodel houdt dat per bron bij.
+1. **Draai `sync artikelen` en laat een jurist de treffers nalopen.** De acht
+   zoekopdrachten dekken de aansluittaak, de transporttaak, verwijdering van een
+   aansluiting, de verplichte leveringsovereenkomst, de tariefvaststelling, het
+   afsluitbeleid, de periodieke aansluitvergoeding en de definitie van
+   *aangeslotene*. Wat de zoeker oplevert is echte wettekst, maar de koppeling aan
+   een bezwaarcategorie is een voorstel — accordeer op `/kennisbank` wat klopt en
+   laat de rest staan. Tot dat gebeurt argumenteert de agent alleen met het
+   Burgerlijk Wetboek. Vorderingen over periodes vóór 2026 worden automatisch onder
+   de Elektriciteitswet 1998 en de Gaswet beantwoord; het datamodel houdt die grens
+   per bron bij.
 2. **De fetchers zijn niet live getest.** Ze zijn geschreven tegen de
    gedocumenteerde open-data-endpoints van KOOP en de Rechtspraak, maar in de
    bouwomgeving blokkeerde het netwerkbeleid beide domeinen. Draai
@@ -157,5 +207,5 @@ app/
   ingest/        PDF/OCR, IMAP, intake
   api/           REST + server-rendered review-UI
   models.py      bezwaren, argumenten, bronnen, concepten, audit
-tests/           26 tests, offline
+tests/           39 tests, offline
 ```

@@ -189,7 +189,19 @@ class Source(Base):
 
     @property
     def citeerbaar(self) -> bool:
-        return self.verificatie in (Verification.BEVESTIGD, Verification.HANDMATIG)
+        """Mag de agent hier in een uitgaande brief naar verwijzen?
+
+        Een geverifieerde tekst is niet hetzelfde als een juiste onderbouwing. Een
+        artikel dat de zoekopdracht automatisch bij een bezwaarcategorie heeft gezet
+        (`auto-gemapt`) heeft een echte, opgehaalde tekst, maar of het artikel dit
+        standpunt draagt is een juridisch oordeel. Dat blijft mensenwerk: pas na
+        accorderen (`handmatig`) mag de agent het aanhalen.
+        """
+        if self.verificatie == Verification.HANDMATIG:
+            return True
+        if self.verificatie != Verification.BEVESTIGD:
+            return False
+        return "auto-gemapt" not in (self.tags or [])
 
 
 class Draft(Base):

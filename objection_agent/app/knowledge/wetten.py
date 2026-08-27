@@ -52,6 +52,72 @@ def _normaliseer_nr(waarde: str) -> str:
     return waarde.strip().rstrip(".").replace(" ", "").lower()
 
 
+@dataclass(frozen=True)
+class RuwArtikel:
+    nummer: str
+    titel: str
+    tekst: str
+
+
+def lees_artikelen(wortel: ET.Element) -> list[RuwArtikel]:
+    """Alle artikelen uit een BWB-document, met hun eigen nummer en tekst."""
+    artikelen: list[RuwArtikel] = []
+    for element in wortel.iter():
+        if _strip_ns(element.tag) != "artikel":
+            continue
+        nummer = ""
+        titel = ""
+        for kind in element:
+            if _strip_ns(kind.tag) != "kop":
+                continue
+            for sub in kind:
+                naam = _strip_ns(sub.tag)
+                if naam == "nr":
+                    nummer = _tekst_van(sub)
+                elif naam in ("titel", "opschrift"):
+                    titel = _tekst_van(sub)
+        if nummer:
+            artikelen.append(RuwArtikel(nummer=nummer, titel=titel, tekst=_tekst_van(element)))
+    return artikelen
+
+
+def doorzoek(
+    artikelen: list[RuwArtikel],
+    verplicht: list[str],
+    trefwoorden: list[str],
+    *,
+    maximum: int = 5,
+) -> list[RuwArtikel]:
+    """Rangschikt artikelen op onderwerp.
+
+    Elk woord uit `verplicht` moet voorkomen; `trefwoorden` bepalen de volgorde.
+    Bewust simpel en deterministisch: de uitkomst moet voor een jurist na te lopen
+    zijn, en een artikel dat hier bovenaan komt is nog steeds een voorstel.
+    """
+    gescoord: list[tuple[int, int, RuwArtikel]] = []
+    for artikel in artikelen:
+        inhoud = f"{artikel.titel} {artikel.tekst}".lower()
+        if not all(woord.lower() in inhoud for woord in verplicht):
+            continue
+        score = sum(inhoud.count(woord.lower()) for woord in trefwoorden)
+        in_kop = sum(3 for woord in trefwoorden if woord.lower() in artikel.titel.lower())
+        gescoord.append((score + in_kop, -len(artikel.tekst), artikel))
+
+    gescoord.sort(key=lambda rij: (rij[0], rij[1]), reverse=True)
+    return [artikel for _, _, artikel in gescoord[:maximum]]
+
+
+def _naar_wetsartikel(ruw: RuwArtikel, bwb_id: str, versie: str) -> Wetsartikel:
+    return Wetsartikel(
+        bwb_id=bwb_id,
+        artikel=ruw.nummer,
+        titel=ruw.titel or f"Artikel {ruw.nummer}",
+        tekst=ruw.tekst,
+        versiedatum=versie,
+        url=f"https://wetten.overheid.nl/{bwb_id}/{versie}#artikel{ruw.nummer}",
+    )
+
+
 class WettenClient:
     def __init__(self, client: httpx.Client | None = None) -> None:
         settings = get_settings()
@@ -99,31 +165,77 @@ class WettenClient:
             return None
         wortel = self.haal_document(bwb_id, versie)
         gezocht = _normaliseer_nr(artikel)
-
-        for element in wortel.iter():
-            if _strip_ns(element.tag) != "artikel":
-                continue
-            nummer = None
-            titel = ""
-            for kind in element:
-                if _strip_ns(kind.tag) != "kop":
-                    continue
-                for sub in kind:
-                    naam = _strip_ns(sub.tag)
-                    if naam == "nr":
-                        nummer = _tekst_van(sub)
-                    elif naam in ("titel", "opschrift"):
-                        titel = _tekst_van(sub)
-            if nummer and _normaliseer_nr(nummer) == gezocht:
-                return Wetsartikel(
-                    bwb_id=bwb_id,
-                    artikel=artikel,
-                    titel=titel or f"Artikel {artikel}",
-                    tekst=_tekst_van(element),
-                    versiedatum=versie,
-                    url=f"https://wetten.overheid.nl/{bwb_id}/{versie}#artikel{artikel}",
-                )
+        for gevonden in lees_artikelen(wortel):
+            if _normaliseer_nr(gevonden.nummer) == gezocht:
+                return _naar_wetsartikel(gevonden, bwb_id, versie)
         return None
+
+    def doorzoek_artikelen(
+        self,
+        bwb_id: str,
+        *,
+        verplicht: list[str],
+        trefwoorden: list[str],
+        peildatum: date | None = None,
+        maximum: int = 5,
+    ) -> list[Wetsartikel]:
+        """Zoekt de artikelen op die over een onderwerp gaan.
+
+        Hiermee hoeft niemand een artikelnummer uit het hoofd op te schrijven: het
+        nummer komt uit de opgehaalde wettekst zelf.
+        """
+        versie = self.versie_op(bwb_id, peildatum)
+        if versie is None:
+            return []
+        wortel = self.haal_document(bwb_id, versie)
+        treffers = doorzoek(lees_artikelen(wortel), verplicht, trefwoorden, maximum=maximum)
+        return [_naar_wetsartikel(t, bwb_id, versie) for t in treffers]
+
+    def alle_artikelen(
+        self, bwb_id: str, *, peildatum: date | None = None
+    ) -> list[Wetsartikel]:
+        versie = self.versie_op(bwb_id, peildatum)
+        if versie is None:
+            return []
+        wortel = self.haal_document(bwb_id, versie)
+        return [_naar_wetsartikel(a, bwb_id, versie) for a in lees_artikelen(wortel)]
+
+    def zoek_bwb_id(self, titel: str, *, maximum: int = 10) -> list[tuple[str, str]]:
+        """Zoekt een BWB-id op titel via de SRU-dienst van KOOP.
+
+        Voor regelingen waarvan het id nog niet in de seed staat, zoals de
+        Aansluit- en transportcode elektriciteit.
+        """
+        response = self._client.get(
+            "https://repository.overheid.nl/sru",
+            params={
+                "operation": "searchRetrieve",
+                "version": "2.0",
+                "maximumRecords": maximum,
+                "query": f'c.product-area==officielepublicaties AND dt.title all "{titel}"',
+            },
+        )
+        response.raise_for_status()
+        wortel = ET.fromstring(response.content)
+
+        gevonden: list[tuple[str, str]] = []
+        huidige_titel = ""
+        for element in wortel.iter():
+            naam = _strip_ns(element.tag)
+            tekst = (element.text or "").strip()
+            if naam == "title" and tekst:
+                huidige_titel = tekst
+            elif tekst.startswith("BWBR"):
+                gevonden.append((tekst, huidige_titel))
+            elif naam == "identifier" and "BWBR" in tekst:
+                match = re.search(r"BWBR\d+", tekst)
+                if match:
+                    gevonden.append((match.group(0), huidige_titel))
+        # dubbele ids ontdubbelen met behoud van volgorde
+        uniek: dict[str, str] = {}
+        for bwb_id, naam in gevonden:
+            uniek.setdefault(bwb_id, naam)
+        return list(uniek.items())
 
     def close(self) -> None:
         self._client.close()

@@ -130,3 +130,38 @@ def test_onbekende_categorie_wordt_geweigerd(client):
         json={"key": "x", "titel": "t", "vindplaats": "v", "categorieen": ["bestaat_niet"]},
     )
     assert response.status_code == 422
+
+
+def test_auto_gemapt_artikel_accorderen_via_de_ui(client):
+    """De juristenroute: opgehaald artikel nalopen en vrijgeven voor gebruik."""
+    from app.db import SessionLocal
+    from app.models import Source, SourceKind, Verification
+
+    with SessionLocal() as s:
+        s.add(
+            Source(
+                key="ew-aansluittaak-3.10",
+                soort=SourceKind.WET,
+                titel="Taken van de netbeheerder",
+                vindplaats="art. 3.10 Energiewet",
+                tekst="De netbeheerder heeft tot taak ...",
+                categorieen=["geen_ondertekend_contract"],
+                verificatie=Verification.BEVESTIGD,
+                tags=["auto-gemapt", "ew-aansluittaak"],
+            )
+        )
+        s.commit()
+
+    pagina = client.get("/kennisbank")
+    assert "wachten op beoordeling" in pagina.text
+
+    response = client.post(
+        "/ui/kennisbank/ew-aansluittaak-3.10/accorderen",
+        data={"beoordelaar": "jurist-01"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+
+    bron = client.get("/api/kennisbank/bronnen").json()
+    gemapt = next(b for b in bron if b["key"] == "ew-aansluittaak-3.10")
+    assert gemapt["citeerbaar"] is True

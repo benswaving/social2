@@ -156,6 +156,8 @@ def haal_bronnen(
 
     treffers = [b for b in kandidaten if gewenst & set(b.categorieen or [])]
     treffers = [b for b in treffers if geldig_op(b, peildatum)]
+    if alleen_citeerbaar:
+        treffers = [b for b in treffers if b.citeerbaar]
     treffers.sort(key=score, reverse=True)
     return treffers[:limiet]
 

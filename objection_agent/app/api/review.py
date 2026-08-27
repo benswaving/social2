@@ -45,11 +45,49 @@ def bezwaar(bezwaar_id: int, request: Request, session: Session = Depends(get_se
 def kennisbank(request: Request, session: Session = Depends(get_session)) -> HTMLResponse:
     bronnen = list(session.scalars(select(Source).order_by(Source.soort, Source.key)))
     citeerbaar = sum(1 for b in bronnen if b.citeerbaar)
+    auto_gemapt = sum(1 for b in bronnen if "auto-gemapt" in (b.tags or []) and not b.citeerbaar)
     return templates.TemplateResponse(
         request=request,
         name="kennisbank.html",
-        context={"bronnen": bronnen, "citeerbaar": citeerbaar},
+        context={"bronnen": bronnen, "citeerbaar": citeerbaar, "auto_gemapt": auto_gemapt},
     )
+
+
+def _bron(session: Session, key: str) -> Source:
+    bron = session.scalar(select(Source).where(Source.key == key))
+    if bron is None:
+        raise HTTPException(status_code=404, detail="Bron niet gevonden")
+    return bron
+
+
+@router.post("/ui/kennisbank/{key}/accorderen")
+def ui_accorderen(
+    key: str, beoordelaar: str = Form(...), session: Session = Depends(get_session)
+) -> RedirectResponse:
+    bron = _bron(session, key)
+    if bron.verificatie == Verification.NIET_GEVONDEN:
+        raise HTTPException(
+            status_code=409,
+            detail="Deze vindplaats bestaat niet bij de officiele bron en kan niet geaccordeerd worden.",
+        )
+    bron.verificatie = Verification.HANDMATIG
+    bron.verificatie_toelichting = f"Geaccordeerd door {beoordelaar}"
+    bron.laatst_gecontroleerd = datetime.now(timezone.utc)
+    session.add(AuditEvent(actor=beoordelaar, actie="bron_geaccordeerd", detail={"key": key}))
+    session.commit()
+    return RedirectResponse(url="/kennisbank", status_code=303)
+
+
+@router.post("/ui/kennisbank/{key}/intrekken")
+def ui_intrekken(
+    key: str, beoordelaar: str = Form(default="onbekend"), session: Session = Depends(get_session)
+) -> RedirectResponse:
+    bron = _bron(session, key)
+    bron.verificatie = Verification.ONGEVERIFIEERD
+    bron.verificatie_toelichting = f"Accordering ingetrokken door {beoordelaar}"
+    session.add(AuditEvent(actor=beoordelaar, actie="bron_accordering_ingetrokken", detail={"key": key}))
+    session.commit()
+    return RedirectResponse(url="/kennisbank", status_code=303)
 
 
 @router.post("/ui/tekst")
@@ -114,4 +152,3 @@ def ui_goedkeuren(
     return RedirectResponse(url=f"/bezwaar/{bezwaar_id}", status_code=303)
 
 
-_ = Verification  # gebruikt in de template via `s.citeerbaar`

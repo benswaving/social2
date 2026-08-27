@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Verkort fragment in de opbouw van een BWB-document, om de artikelzoeker te
+     testen zonder netwerk. De teksten zijn geparafraseerd en dienen alleen als
+     testmateriaal; ze zijn nadrukkelijk geen wettekst. -->
+<toestand xmlns="http://schemas.overheid.nl/bwb">
+  <wetgeving>
+    <wettekst>
+      <hoofdstuk>
+        <kop><label>Hoofdstuk</label><nr>3</nr><titel>Netbeheer</titel></kop>
+        <artikel>
+          <kop><label>Artikel</label><nr>3.10</nr><titel>Taken van de netbeheerder</titel></kop>
+          <lid><lidnr>1</lidnr><al>De netbeheerder heeft tot taak een aansluiting te
+            realiseren op verzoek van degene die daarom vraagt, en die aansluiting in
+            stand te houden ten behoeve van de aangeslotene.</al></lid>
+          <lid><lidnr>2</lidnr><al>De netbeheerder voert deze taak uit binnen een
+            redelijke termijn na het verzoek.</al></lid>
+        </artikel>
+        <artikel>
+          <kop><label>Artikel</label><nr>3.11</nr><titel>Transporttaak</titel></kop>
+          <lid><lidnr>1</lidnr><al>De netbeheerder biedt op verzoek transport aan aan
+            iedere aangeslotene en voert dat transport uit.</al></lid>
+        </artikel>
+        <artikel>
+          <kop><label>Artikel</label><nr>3.12</nr><titel>Vergoeding voor het beheer</titel></kop>
+          <lid><lidnr>1</lidnr><al>Een netbeheerder ontvangt voor het beheer van het
+            systeem een vergoeding.</al></lid>
+        </artikel>
+      </hoofdstuk>
+      <hoofdstuk>
+        <kop><label>Hoofdstuk</label><nr>4</nr><titel>Tarieven</titel></kop>
+        <artikel>
+          <kop><label>Artikel</label><nr>4.20</nr><titel>Vaststelling van tarieven</titel></kop>
+          <lid><lidnr>1</lidnr><al>De ACM stelt jaarlijks het tarief vast dat een
+            netbeheerder ten hoogste in rekening mag brengen voor de aansluiting en
+            voor het transport.</al></lid>
+        </artikel>
+      </hoofdstuk>
+    </wettekst>
+  </wetgeving>
+</toestand>

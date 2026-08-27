@@ -1,13 +1,21 @@
 {% extends "basis.html" %}
 {% block inhoud %}
 <h2 style="margin-top:0">Kennisbank</h2>
+{% if auto_gemapt %}
+<div class="melding waarschuwing">
+  <strong>{{ auto_gemapt }} artikelen wachten op beoordeling</strong>
+  Deze zijn automatisch bij een bezwaarcategorie gezocht. De tekst is opgehaald bij de
+  officiële bron en klopt; of het artikel het standpunt draagt, beoordeelt u.
+  De agent verwijst er pas naar na accordering.
+</div>
+{% endif %}
 <p class="gedempt">
   {{ citeerbaar }} van {{ bronnen|length }} bronnen zijn geverifieerd of geaccordeerd en mogen
   in een uitgaande brief worden geciteerd. De rest is zichtbaar voor de medewerker, maar de
   agent verwijst er niet naar.
 </p>
 <table>
-  <tr><th>Key</th><th>Soort</th><th>Vindplaats</th><th>Status</th><th>Categorieën</th></tr>
+  <tr><th>Key</th><th>Soort</th><th>Vindplaats</th><th>Status</th><th>Categorieën</th><th></th></tr>
   {% for s in bronnen %}
   <tr>
     <td><code>{{ s.key }}</code></td>
@@ -19,6 +27,21 @@
       <div class="gedempt">{{ s.verificatie_toelichting or "" }}</div>
     </td>
     <td class="gedempt">{{ (s.categorieen or [])|join(", ") }}</td>
+    <td>
+      {% if s.verificatie.value == "niet_gevonden" %}
+        <span class="gedempt">niet te accorderen</span>
+      {% elif s.citeerbaar %}
+        <form method="post" action="/ui/kennisbank/{{ s.key }}/intrekken">
+          <input type="hidden" name="beoordelaar" value="jurist">
+          <button type="submit" class="secundair">Intrekken</button>
+        </form>
+      {% else %}
+        <form method="post" action="/ui/kennisbank/{{ s.key }}/accorderen">
+          <input type="text" name="beoordelaar" placeholder="Uw naam" required style="width:110px">
+          <button type="submit">Accorderen</button>
+        </form>
+      {% endif %}
+    </td>
   </tr>
   {% endfor %}
 </table>

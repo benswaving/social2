@@ -19,27 +19,62 @@ wetten:
   - bwb_id: BWBR0005288
     naam: "Burgerlijk Wetboek Boek 5"
     afkorting: BW5
+  - bwb_id: BWBR0005537
+    naam: "Algemene wet bestuursrecht"
+    afkorting: Awb
+
+  # --- Energierecht ---------------------------------------------------
+  # De Energiewet is op 1 januari 2026 in werking getreden; de Elektriciteitswet
+  # 1998 en de Gaswet zijn op diezelfde datum ingetrokken. Vorderingen over
+  # periodes daarvóór moeten dus nog onder het oude recht worden beantwoord.
+  # Het datamodel houdt die grens per bron bij (`geldig_vanaf` / `geldig_tot`).
+  - bwb_id: BWBR0050714
+    naam: "Energiewet"
+    afkorting: Ew
+    geldig_vanaf: "2026-01-01"
   - bwb_id: BWBR0009755
     naam: "Elektriciteitswet 1998"
     afkorting: E-wet
     geldig_tot: "2025-12-31"
-    vervangen_door: energiewet
-    notitie: >-
-      Vervallen per invoering van de Energiewet. Blijft nodig voor vorderingen
-      over periodes vóór die datum; controleer de exacte vervaldatum bij de bron.
+    vervangen_door: Ew
   - bwb_id: BWBR0011440
     naam: "Gaswet"
     afkorting: Gaswet
     geldig_tot: "2025-12-31"
-    vervangen_door: energiewet
+    vervangen_door: Ew
+
+  # --- ACM-codes onder de Energiewet ----------------------------------
+  # Sinds de Energiewet staan de codebesluiten in het BWB, en zijn ze dus langs
+  # dezelfde weg op te halen en te verifieren als de wet zelf. Dat scheelt de
+  # afdeling het handmatig aanleveren van deze documenten.
+  - bwb_id: BWBR0052321
+    naam: "Tarievencode elektriciteit 2026"
+    afkorting: TarE
+    geldig_vanaf: "2026-01-01"
+  - bwb_id: BWBR0052320
+    naam: "Begrippencode elektriciteit 2026"
+    afkorting: BegE
+    geldig_vanaf: "2026-01-01"
+  - bwb_id: BWBR0052336
+    naam: "Systeemcode elektriciteit 2026"
+    afkorting: SysE
+    geldig_vanaf: "2026-01-01"
+  - bwb_id: BWBR0052332
+    naam: "Aansluit- en transportcode gas DSB"
+    afkorting: ATCGas
+    geldig_vanaf: "2026-01-01"
   - bwb_id: null
-    naam: "Energiewet"
-    afkorting: Ew
+    naam: "Aansluit- en transportcode elektriciteit"
+    afkorting: ATCE
     geldig_vanaf: "2026-01-01"
     notitie: >-
-      BWB-id nog invullen. Draai `python -m app.knowledge.sync resolve-bwb "Energiewet"`
-      op een omgeving met internettoegang, of vul het handmatig in. Zolang het id
-      ontbreekt blijven alle Energiewet-artikelen ongeverifieerd en dus onciteerbaar.
+      BWB-id nog niet vastgesteld. Draai `python -m app.knowledge.sync resolve-bwb
+      "Aansluit- en transportcode elektriciteit"`; die zoekt het id op via de
+      SRU-dienst van KOOP en drukt de regel af die hier ingevuld moet worden.
+  - bwb_id: BWBR0051774
+    naam: "Energieregeling"
+    afkorting: Ereg
+    geldig_vanaf: "2026-01-01"
 
 artikelen:
   # --- Overeenkomst en wilsvertrouwen ---------------------------------
@@ -183,69 +218,109 @@ artikelen:
       eigenaar van het net. Relevant bij 'de kabel ligt op mijn grond dus is van mij'.
     categorieen: [feitelijke_aansluiting_betwist, pseudojuridisch]
 
-  # --- Energierecht: aansluit- en transporttaak -----------------------
-  # Deze verwijzingen staan bewust op artikelniveau leeg tot de synchronisatie
-  # de Energiewet heeft opgehaald. Vul `artikel` in zodra het BWB-id bekend is.
-  - key: ew-aansluittaak
-    wet: Ew
-    artikel: null
-    vindplaats: "Energiewet, aansluittaak netbeheerder"
-    onderwerp: >-
-      Wettelijke taak van de netbeheerder om aangeslotenen aan te sluiten en te voorzien
-      van transport. Grondslag voor de vordering die niet afhangt van een handtekening.
-    categorieen: [geen_ondertekend_contract, geen_verbruik, feitelijke_aansluiting_betwist]
-    te_verifieren: true
-  - key: ew-tariefstructuur
-    wet: Ew
-    artikel: null
-    vindplaats: "Energiewet, tarieven en tariefstructuren"
-    onderwerp: >-
-      Door de ACM vastgestelde tarieven voor aansluiting en transport, die de
-      netbeheerder verplicht in rekening brengt. Onderbouwt dat het tarief niet
-      onderhandelbaar en niet verbruiksafhankelijk is.
-    categorieen: [geen_verbruik, hoogte_rente_en_incassokosten, leegstand_of_sloop]
-    te_verifieren: true
-  - key: ew-leveringsovereenkomst
-    wet: Ew
-    artikel: null
-    vindplaats: "Energiewet, verplichting tot een leveringsovereenkomst"
-    onderwerp: >-
-      Grondslag voor de eis dat een aangeslotene een leveringsovereenkomst heeft.
-      Dit is het hart van het ASC-dossier; laat een jurist de exacte artikelen
-      bevestigen voordat de agent hiernaar verwijst.
-    categorieen: [geen_ondertekend_contract, reeds_leverancier_gevonden]
-    te_verifieren: true
-
   # --- Bestuursrecht: juist om uit te leggen dat het NIET geldt -------
   - key: awb-1-1
-    wet: null
+    wet: Awb
     artikel: "1:1"
     vindplaats: "art. 1:1 Awb"
     onderwerp: >-
       Definitie van bestuursorgaan. Gebruikt om uit te leggen dat de netbeheerder dat
       niet is en dat de Awb-bezwaarprocedure hier niet geldt.
     categorieen: [awb_verwarring]
-    te_verifieren: true
 
+# Artikelzoekers: de agent zoekt de artikelnummers zelf op in de opgehaalde wettekst.
+#
+# Waarom geen lijst met artikelnummers? Om dezelfde reden dat er geen ECLI's in de
+# seed staan. Een artikelnummer dat uit het geheugen komt en er plausibel uitziet is
+# precies het probleem dat deze agent moet opvangen. `sync artikelen` haalt de wet op
+# bij het KOOP-repository, doorzoekt de artikelen op deze trefwoorden en slaat op wat
+# er echt in staat, met het echte nummer en de echte tekst.
+#
+# `verplicht` moet allemaal voorkomen in het artikel; `trefwoorden` bepalen de
+# rangschikking. Wat gevonden wordt krijgt de tag `auto-gemapt`: de tekst is
+# geverifieerd, maar of het artikel bij deze bezwaarcategorie hoort beoordeelt een
+# jurist. Pas na accorderen mag de agent ernaar verwijzen.
+
+artikelzoekers:
+  - key: ew-aansluittaak
+    wet: Ew
+    doel: "De wettelijke taak van de netbeheerder om aan te sluiten"
+    verplicht: ["netbeheerder", "aansluiting"]
+    trefwoorden: ["taak", "verzoek", "realiseren", "aansluiten", "aangeslotene"]
+    categorieen: [geen_ondertekend_contract, feitelijke_aansluiting_betwist, geen_verbruik]
+    maximum: 4
+
+  - key: ew-transporttaak
+    wet: Ew
+    doel: "De transporttaak en de verplichting transport aan te bieden"
+    verplicht: ["netbeheerder", "transport"]
+    trefwoorden: ["taak", "aanbieden", "uitvoeren", "verzoek", "aangeslotene"]
+    categorieen: [geen_verbruik, leegstand_of_sloop]
+    maximum: 4
+
+  - key: ew-verwijdering-aansluiting
+    wet: Ew
+    doel: "Wijzigen of verwijderen van een aansluiting op verzoek"
+    verplicht: ["aansluiting", "verwijder"]
+    trefwoorden: ["wijzigen", "verzoek", "kosten", "aangeslotene"]
+    categorieen: [leegstand_of_sloop, feitelijke_aansluiting_betwist]
+    maximum: 3
+
+  - key: ew-leveringsovereenkomst
+    wet: Ew
+    doel: "De verplichting van een eindafnemer om een leveringsovereenkomst te hebben"
+    verplicht: ["leveringsovereenkomst"]
+    trefwoorden: ["eindafnemer", "leverancier", "aangeslotene", "verplicht", "sluiten"]
+    categorieen: [geen_ondertekend_contract, reeds_leverancier_gevonden]
+    maximum: 5
+
+  - key: ew-tarieven
+    wet: Ew
+    doel: "Vaststelling van tarieven door de ACM en de verplichting die in rekening te brengen"
+    verplicht: ["tarief"]
+    trefwoorden: ["ACM", "vaststellen", "aansluiting", "transport", "in rekening"]
+    categorieen: [geen_verbruik, hoogte_rente_en_incassokosten, leegstand_of_sloop]
+    maximum: 5
+
+  - key: ew-afsluiten
+    wet: Ew
+    doel: "Beeindigen van transport of afsluiten van een aansluiting"
+    verplicht: ["afsluit"]
+    trefwoorden: ["eindafnemer", "beeindigen", "transport", "kleinverbruiker"]
+    categorieen: [schrijnende_omstandigheden, awb_verwarring]
+    maximum: 4
+
+  - key: tare-periodieke-aansluitvergoeding
+    wet: TarE
+    doel: "Periodieke aansluitvergoeding en vastrecht: niet verbruiksafhankelijk"
+    verplicht: ["aansluit"]
+    trefwoorden: ["periodiek", "vergoeding", "vastrecht", "tarief", "capaciteit"]
+    categorieen: [geen_verbruik, leegstand_of_sloop, hoogte_rente_en_incassokosten]
+    maximum: 5
+
+  - key: bege-aangeslotene
+    wet: BegE
+    doel: "Definitie van aangeslotene: wie is de betalingsplichtige partij?"
+    verplicht: ["aangeslotene"]
+    trefwoorden: ["definitie", "eigenaar", "gebruiker", "onroerende zaak", "rechthebbende"]
+    categorieen: [verkeerde_partij, geen_ondertekend_contract]
+    maximum: 3
+
+# Materiaal dat niet in het BWB staat en dus door de afdeling zelf wordt aangeleverd
+# via POST /api/kennisbank/bronnen.
 regelingen:
-  # Niet in het BWB te vinden: dit zijn ACM-codebesluiten en branchevoorwaarden.
-  # Aanleveren via de kennisbank-import (`POST /api/knowledge/sources`).
-  - key: atv-elektriciteit
-    titel: "Aansluit- en transportvoorwaarden Elektriciteit (ACM-codebesluit)"
-    categorieen: [geen_ondertekend_contract, geen_verbruik, leegstand_of_sloop]
-    url: "https://www.acm.nl/nl/onderwerpen/energie/energiebedrijven/codes-energie"
+  - key: werkinstructie-asc
+    titel: "Interne werkinstructie Aansluiting Zonder Contract"
+    categorieen: [geen_ondertekend_contract, leegstand_of_sloop, verkeerde_partij]
     aanleveren_door: "afdeling ASC"
-  - key: atv-gas
-    titel: "Aansluit- en transportvoorwaarden Gas (ACM-codebesluit)"
-    categorieen: [geen_ondertekend_contract, geen_verbruik, leegstand_of_sloop]
-    url: "https://www.acm.nl/nl/onderwerpen/energie/energiebedrijven/codes-energie"
-    aanleveren_door: "afdeling ASC"
-  - key: tarievencode
-    titel: "Tarievencode Elektriciteit / Gas"
-    categorieen: [geen_verbruik, hoogte_rente_en_incassokosten]
+  - key: standaardparagrafen-asc
+    titel: "Vastgestelde standaardparagrafen voor uitgaande brieven"
+    categorieen: [geen_ondertekend_contract, geen_verbruik, awb_verwarring]
     aanleveren_door: "afdeling ASC"
   - key: afsluitbeleid-kleinverbruikers
     titel: "Regeling afsluitbeleid voor kleinverbruikers van elektriciteit, gas en warmte"
-    categorieen: [schrijnende_omstandigheden, awb_verwarring]
+    categorieen: [schrijnende_omstandigheden]
     aanleveren_door: "afdeling ASC"
-    te_verifieren: true
+    notitie: >-
+      Controleer of deze regeling onder de Energiewet is vervangen; zo ja, haal de
+      opvolger op met `sync resolve-bwb` in plaats van hem handmatig aan te leveren.
