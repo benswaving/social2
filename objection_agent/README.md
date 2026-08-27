@@ -155,6 +155,9 @@ de medewerker maar niet citeerbaar.
 ## Draaien
 
 ```bash
+# Optioneel: demo-dossiers inladen zodat de werkvoorraad iets te tonen heeft
+.venv/bin/python -m app.demo
+
 .venv/bin/uvicorn app.main:app --reload --port 8100
 ```
 
@@ -171,7 +174,7 @@ productiemodus, en dossiers die zo zijn behandeld worden altijd geëscaleerd.
 .venv/bin/python -m pytest tests/ -q
 ```
 
-42 tests, volledig offline: geen API-sleutel en geen netwerk nodig. De artikelzoeker
+45 tests, volledig offline: geen API-sleutel en geen netwerk nodig. De artikelzoeker
 wordt getest tegen een lokaal BWB-fragment, zodat de logica controleerbaar is zonder
 toegang tot het repository.
 
@@ -219,5 +222,5 @@ app/
   ingest/        PDF/OCR, IMAP, intake
   api/           REST + server-rendered review-UI
   models.py      bezwaren, argumenten, bronnen, concepten, audit
-tests/           42 tests, offline
+tests/           45 tests, offline
 ```

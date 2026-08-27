@@ -140,15 +140,34 @@ def controleer_concept(
         )
 
     # 4. Is elk argument behandeld?
+    #
+    #    Meerdere signalen, want een goede brief parafraseert het bezwaar in plaats
+    #    van het na te papegaaien. Een argument geldt als behandeld zodra de brief
+    #    de woorden van de klant oppakt, het standpunt van de afdeling erover
+    #    verwoordt, of er een genummerde alinea aan wijdt. Alleen als geen van
+    #    drieën opgaat is er reden om te denken dat het punt is overgeslagen.
     onbehandeld = []
     laag = brief.lower()
     for argument in argumenten:
-        kernwoorden = [
+        volgnummer = getattr(argument, "volgnummer", None)
+        bronnen_van_woorden = [
+            getattr(argument, "stelling", "") or "",
+            getattr(argument, "citaat", "") or "",
+            getattr(argument, "standpunt", "") or "",
+        ]
+        kernwoorden = {
             woord
-            for woord in re.findall(r"[a-zà-ü]{6,}", (argument.stelling or "").lower())
-        ][:6]
-        if kernwoorden and not any(woord in laag for woord in kernwoorden):
-            onbehandeld.append(argument.stelling[:120])
+            for tekst in bronnen_van_woorden
+            for woord in re.findall(r"[a-zà-ü]{6,}", tekst.lower())
+        }
+        if kernwoorden and any(woord in laag for woord in kernwoorden):
+            continue
+        if volgnummer and re.search(
+            rf"(?:^|\n)\s*(?:punt\s+)?{volgnummer}[.)\s]", brief, re.IGNORECASE
+        ):
+            continue
+        if kernwoorden:
+            onbehandeld.append((getattr(argument, "stelling", "") or "")[:120])
     if onbehandeld:
         rapport.bevindingen.append(
             Bevinding(

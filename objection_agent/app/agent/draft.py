@@ -184,6 +184,11 @@ def schrijf_concept(
     citeerbaar = [b for b in bronnen if b.citeerbaar]
     toegestane_vindplaatsen = _toegestane_vindplaatsen(citeerbaar, oordelen)
     taxonomie = load_taxonomie()
+    # De controle op "is elk argument behandeld" kijkt ook naar het standpunt van de
+    # afdeling, omdat een brief het bezwaar hoort te parafraseren en niet na te praten.
+    for volgnummer, argument in enumerate(analyse.argumenten, start=1):
+        argument.volgnummer = volgnummer
+        argument.standpunt = taxonomie.get(argument.categorie).kern
     interne_instructies = [
         taxonomie.get(a.categorie).instructie
         for a in analyse.argumenten

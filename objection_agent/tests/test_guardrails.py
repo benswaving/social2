@@ -94,3 +94,57 @@ def test_normale_brief_raakt_de_instructiecontrole_niet():
         interne_instructies=["Nooit standaard afwijzen; laat een jurist de stuitingsbrieven nalopen."],
     )
     assert not rapport.geblokkeerd
+
+
+class _Volledig:
+    """Argument zoals het bij de controle aankomt, met alle signalen."""
+
+    def __init__(self, volgnummer, stelling, standpunt="", citaat=""):
+        self.volgnummer = volgnummer
+        self.stelling = stelling
+        self.standpunt = standpunt
+        self.citaat = citaat
+
+
+def test_genummerde_alinea_telt_als_behandeld():
+    """Een brief mag het bezwaar parafraseren in plaats van het na te praten."""
+    brief = (
+        "Geachte heer,\n\nPunt 1\nWij lichten toe waarom de betalingsverplichting blijft "
+        "bestaan.\n\nPunt 2\nDit onderzoeken wij nog.\n"
+    )
+    rapport = controleer_concept(
+        brief,
+        toegestane_vindplaatsen=set(),
+        brontekst="",
+        argumenten=[
+            _Volledig(1, "Pseudojuridische constructie (soevereine burger e.d.)"),
+            _Volledig(2, "Het pand staat leeg / is gesloopt"),
+        ],
+    )
+    assert "argument_niet_behandeld" not in _codes(rapport)
+
+
+def test_standpunt_van_de_afdeling_telt_ook_als_behandeld():
+    rapport = controleer_concept(
+        "Wij lichten toe dat de aansluitvergoeding niet verbruiksafhankelijk is.",
+        toegestane_vindplaatsen=set(),
+        brontekst="",
+        argumenten=[
+            _Volledig(
+                1,
+                "Ik verbruik niets",
+                standpunt="De aansluitvergoeding is niet verbruiksafhankelijk.",
+            )
+        ],
+    )
+    assert "argument_niet_behandeld" not in _codes(rapport)
+
+
+def test_echt_overgeslagen_argument_wordt_nog_steeds_gemeld():
+    rapport = controleer_concept(
+        "Geachte heer,\n\nWij hebben uw brief ontvangen en danken u daarvoor.\n",
+        toegestane_vindplaatsen=set(),
+        brontekst="",
+        argumenten=[_Volledig(1, "De vordering is verjaard", standpunt="Verjaring van periodieke betalingen")],
+    )
+    assert "argument_niet_behandeld" in _codes(rapport)

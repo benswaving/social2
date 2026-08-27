@@ -32,6 +32,8 @@ class ArgumentUitkomst:
     merit_score: float
     onderbouwing: str
     benodigde_feitencheck: list[str] = field(default_factory=list)
+    volgnummer: int = 0
+    standpunt: str = ""  # gevuld bij het opstellen van het concept
 
 
 @dataclass
