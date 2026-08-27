@@ -1,0 +1,25 @@
+{% extends "basis.html" %}
+{% block inhoud %}
+<h2 style="margin-top:0">Kennisbank</h2>
+<p class="gedempt">
+  {{ citeerbaar }} van {{ bronnen|length }} bronnen zijn geverifieerd of geaccordeerd en mogen
+  in een uitgaande brief worden geciteerd. De rest is zichtbaar voor de medewerker, maar de
+  agent verwijst er niet naar.
+</p>
+<table>
+  <tr><th>Key</th><th>Soort</th><th>Vindplaats</th><th>Status</th><th>Categorieën</th></tr>
+  {% for s in bronnen %}
+  <tr>
+    <td><code>{{ s.key }}</code></td>
+    <td>{{ s.soort.value }}</td>
+    <td>{{ s.vindplaats }}<div class="gedempt">{{ (s.titel or "")[:120] }}</div></td>
+    <td>
+      <span class="vlag {{ 'kansrijk' if s.citeerbaar else ('blokkerend' if s.verificatie.value == 'niet_gevonden' else 'waarschuwing') }}">
+        {{ s.verificatie.value }}</span>
+      <div class="gedempt">{{ s.verificatie_toelichting or "" }}</div>
+    </td>
+    <td class="gedempt">{{ (s.categorieen or [])|join(", ") }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

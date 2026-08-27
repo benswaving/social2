@@ -1,0 +1,76 @@
+# Jurisprudentie: zoekprofielen, GEEN vooraf ingetypte ECLI-nummers.
+#
+# Waarom geen lijst met uitspraken hier? Precies om de reden dat jullie deze agent
+# bouwen: taalmodellen verzinnen ECLI-nummers die er echt uitzien. Een uit het hoofd
+# opgeschreven lijst zou dat probleem naar binnen halen in plaats van oplossen.
+#
+# In plaats daarvan draait `python -m app.knowledge.sync jurisprudentie` deze
+# zoekprofielen af tegen de Open Data van de Rechtspraak. Elke gevonden uitspraak
+# wordt opgeslagen met haar echte ECLI en echte tekst, en krijgt de tag `kandidaat`.
+# Een jurist zet een kandidaat op `handmatig` (= geaccordeerd) voordat de agent
+# ermee mag argumenteren. Kandidaten worden wel getoond in de review-UI, zodat de
+# medewerker ze kan wegen, maar ze komen niet ongezien in een uitgaande brief.
+
+versie: "2026-08-1"
+
+standaard:
+  rechtsgebied: "http://psi.rechtspraak.nl/rechtsgebied#civielRecht"
+  vanaf: "2012-01-01"
+  max_per_profiel: 25
+
+profielen:
+
+  - key: jur-stilzwijgende-overeenkomst
+    categorieen: [geen_ondertekend_contract]
+    doel: >-
+      Uitspraken waarin een aansluit- of leveringsverhouding zonder ondertekend
+      contract is aangenomen op grond van feitelijk gebruik.
+    zoektermen:
+      - "netbeheerder aansluitovereenkomst stilzwijgend aanvaard"
+      - "energie afgenomen zonder overeenkomst betalingsverplichting"
+
+  - key: jur-vastrecht-zonder-verbruik
+    categorieen: [geen_verbruik, leegstand_of_sloop]
+    doel: "Vastrecht en capaciteitstarief bij nul verbruik of leegstand."
+    zoektermen:
+      - "vastrecht aansluiting leegstand verschuldigd netbeheerder"
+      - "periodieke aansluitvergoeding geen verbruik"
+
+  - key: jur-aangeslotene-eigenaar-huurder
+    categorieen: [verkeerde_partij]
+    doel: "Wie is aangeslotene: eigenaar, huurder of gebruiker van het pand?"
+    zoektermen:
+      - "aangeslotene eigenaar huurder aansluiting energie wie betaalt"
+      - "netbeheerder vordering verhuurder leegstaand pand"
+
+  - key: jur-verjaring-periodiek
+    categorieen: [verjaring]
+    doel: "Verjaring van periodieke energievorderingen en geldige stuiting."
+    zoektermen:
+      - "verjaring periodieke betaling energie vastrecht stuiting"
+      - "3:308 BW energieleverancier verjaring"
+
+  - key: jur-algemene-voorwaarden-energie
+    categorieen: [algemene_voorwaarden, hoogte_rente_en_incassokosten]
+    doel: "Vernietiging van bedingen en ambtshalve toetsing bij consumenten."
+    zoektermen:
+      - "algemene voorwaarden energie vernietiging informatieplicht consument"
+      - "ambtshalve toetsing incassokosten veertiendagenbrief"
+
+  - key: jur-pseudojuridisch
+    categorieen: [pseudojuridisch, awb_verwarring]
+    doel: >-
+      Uitspraken waarin soevereine-burgerachtige verweren uitdrukkelijk zijn
+      verworpen. Nuttig om kort en feitelijk naar te verwijzen.
+    zoektermen:
+      - "verweer natuurlijk persoon rechtspersoon verworpen onbegrijpelijk"
+      - "beroep op niet bestaande rechtsregel verworpen"
+
+  - key: jur-onterechte-vordering
+    categorieen: [dubbele_facturatie, feitelijke_aansluiting_betwist]
+    doel: >-
+      Zaken waarin de netbeheerder juist ongelijk kreeg. Bewust opgenomen: de agent
+      moet ook kunnen zien wanneer een bezwaar hout snijdt.
+    zoektermen:
+      - "vordering netbeheerder afgewezen onvoldoende onderbouwd aansluiting"
+      - "energiefactuur onterecht in rekening gebracht afgewezen"

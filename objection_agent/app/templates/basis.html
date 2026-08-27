@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titel %}Bezwaren ASC{% endblock %}</title>
+  <style>
+    :root {
+      --rand: #d8dde3; --tekst: #1b1f24; --gedempt: #5a6470; --vlak: #f6f7f9;
+      --rood: #b3261e; --oranje: #8a5a00; --groen: #1f6f43; --blauw: #1b4f9c;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+           color: var(--tekst); background: #fff; }
+    header { border-bottom: 1px solid var(--rand); padding: 14px 22px; display: flex;
+             gap: 18px; align-items: baseline; }
+    header h1 { font-size: 16px; margin: 0; }
+    header a { color: var(--blauw); text-decoration: none; font-size: 14px; }
+    main { padding: 22px; max-width: 1400px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--rand);
+             vertical-align: top; font-size: 14px; }
+    th { font-weight: 600; color: var(--gedempt); font-size: 12px; text-transform: uppercase;
+         letter-spacing: .04em; }
+    .vlag { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px;
+            border: 1px solid currentColor; white-space: nowrap; }
+    .kansrijk { color: var(--groen); } .twijfelachtig { color: var(--oranje); }
+    .kansarm { color: var(--gedempt); } .onbepaald { color: var(--gedempt); }
+    .waarschuwing { color: var(--oranje); } .blokkerend { color: var(--rood); }
+    .kolommen { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; align-items: start; }
+    .paneel { border: 1px solid var(--rand); border-radius: 6px; padding: 16px; }
+    .paneel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em;
+                 color: var(--gedempt); margin: 0 0 12px; }
+    pre { white-space: pre-wrap; word-wrap: break-word; font: inherit; margin: 0; }
+    .brief { background: var(--vlak); padding: 14px; border-radius: 4px; max-height: 70vh;
+             overflow: auto; }
+    .melding { border-left: 3px solid currentColor; padding: 8px 12px; margin-bottom: 10px;
+               background: var(--vlak); }
+    .melding strong { display: block; font-size: 13px; }
+    .melding ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; }
+    textarea { width: 100%; min-height: 120px; font: inherit; padding: 10px;
+               border: 1px solid var(--rand); border-radius: 4px; }
+    input[type=text] { font: inherit; padding: 7px 9px; border: 1px solid var(--rand);
+                       border-radius: 4px; }
+    button { font: inherit; padding: 8px 16px; border-radius: 4px; border: 1px solid var(--blauw);
+             background: var(--blauw); color: #fff; cursor: pointer; }
+    button.secundair { background: #fff; color: var(--blauw); }
+    .gedempt { color: var(--gedempt); font-size: 13px; }
+    .argument { border-top: 1px solid var(--rand); padding: 12px 0; }
+    .argument:first-of-type { border-top: 0; }
+    .argument blockquote { margin: 6px 0; padding-left: 10px; border-left: 2px solid var(--rand);
+                           color: var(--gedempt); font-size: 13px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Bezwaren — Aansluiting Zonder Contract</h1>
+    <a href="/">Werkvoorraad</a>
+    <a href="/kennisbank">Kennisbank</a>
+    <a href="/docs">API</a>
+    <span class="gedempt" style="margin-left:auto">Concepten gaan nooit uit zonder goedkeuring</span>
+  </header>
+  <main>{% block inhoud %}{% endblock %}</main>
+</body>
+</html>

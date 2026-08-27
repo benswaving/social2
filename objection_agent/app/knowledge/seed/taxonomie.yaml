@@ -1,0 +1,264 @@
+# Taxonomie van bezwaren bij Aansluiting Zonder Contract (ASC).
+#
+# `prior` is GEEN eindoordeel: het is de verwachtingswaarde vóór de feiten van dit
+# dossier bekend zijn (0.0 = vrijwel kansloos, 1.0 = vrijwel zeker terecht).
+# De beoordelaar mag hiervan afwijken op grond van de feiten; `feitencheck` zegt
+# welke feiten daarvoor nodig zijn.
+#
+# `escalatie: true` betekent: dit gaat ALTIJD naar een mens met juridische kennis,
+# ook als de agent denkt dat het bezwaar kansarm is.
+
+versie: "2026-08-1"
+
+categorieen:
+
+  geen_ondertekend_contract:
+    label: "Ik heb nooit een contract getekend"
+    prior: 0.15
+    escalatie: false
+    kern: >-
+      Een aansluit- en transportovereenkomst met de netbeheerder komt niet uitsluitend
+      door ondertekening tot stand. Wie een aansluiting feitelijk in stand houdt en
+      daarvan gebruikmaakt, wekt het vertrouwen dat hij die overeenkomst aanvaardt.
+      Daarnaast rust de aansluit- en transporttaak van de netbeheerder op de wet, niet
+      op de handtekening van de aangeslotene.
+    bron_zoektermen:
+      - "aanbod aanvaarding stilzwijgend tot stand gekomen overeenkomst"
+      - "netbeheerder aansluitovereenkomst zonder handtekening"
+    feitencheck:
+      - "Staat de aansluiting op naam van deze partij en sinds wanneer?"
+      - "Is er feitelijk transport/verbruik geregistreerd in de gefactureerde periode?"
+
+  feitelijke_aansluiting_betwist:
+    label: "Er is helemaal geen aansluiting"
+    prior: 0.30
+    escalatie: false
+    kern: >-
+      Is er aantoonbaar geen aansluiting (meer), dan is de vordering onjuist en
+      corrigeren wij die.
+    instructie: >-
+      Feitelijke vraag. Controleer eerst het meterregister voordat u antwoordt.
+    feitencheck:
+      - "Bestaat de aansluiting nog fysiek (meterregister / netkaart)?"
+      - "Is er ooit een verzoek tot verwijdering gedaan en hoe is dat afgehandeld?"
+
+  geen_verbruik:
+    label: "Ik verbruik niets, dus ik hoef niets te betalen"
+    prior: 0.10
+    escalatie: false
+    kern: >-
+      De periodieke aansluitvergoeding en de vastrechtcomponent van de transportkosten
+      zijn niet verbruiksafhankelijk. Zij vergoeden het in stand houden van de
+      aansluiting en de beschikbaarheid van het net, niet de afgenomen energie.
+    feitencheck:
+      - "Betreft de vordering vastrecht/capaciteitstarief of verbruikskosten?"
+
+  leegstand_of_sloop:
+    label: "Het pand staat leeg / is gesloopt"
+    prior: 0.25
+    escalatie: false
+    kern: >-
+      Leegstand beëindigt de betalingsverplichting niet: zolang de aansluiting in stand
+      blijft, blijven de aansluit- en transportkosten verschuldigd. Wilt u geen kosten
+      meer maken, dan moet de aansluiting worden verwijderd. Is het pand gesloopt en de
+      aansluiting verwijderd, dan stopt de vordering per die datum.
+    instructie: >-
+      Controleer eerst de verwijderdatum voordat u het standpunt inneemt.
+    feitencheck:
+      - "Datum sloop/verwijdering aansluiting en wie heeft dat gemeld?"
+      - "Loopt de gefactureerde periode door na die datum?"
+
+  verkeerde_partij:
+    label: "Ik ben niet (meer) de eigenaar/gebruiker"
+    prior: 0.55
+    escalatie: false
+    kern: >-
+      Zodra de overdracht of het einde van het gebruiksrecht is aangetoond, hoort de
+      vordering vanaf die datum bij de rechtsopvolger.
+    instructie: >-
+      Splits de vordering op de overdrachtsdatum in plaats van hem in zijn geheel af te
+      wijzen of in zijn geheel te handhaven.
+    feitencheck:
+      - "Leveringsakte / kadastrale overdrachtsdatum"
+      - "Huurovereenkomst: wie is aangeslotene, huurder of verhuurder?"
+      - "Datum uitschrijving BRP / KvK-mutatie"
+
+  verjaring:
+    label: "De vordering is verjaard"
+    prior: 0.50
+    escalatie: true
+    kern: >-
+      Voor periodieke betalingen geldt een korte verjaringstermijn. Of een vordering
+      is verjaard hangt af van de opeisbaarheidsdata en van eerdere aanmaningen die de
+      verjaring hebben gestuit.
+    instructie: >-
+      Gemengde feiten- en rechtsvraag. Nooit standaard afwijzen; laat een jurist de
+      opeisbaarheidsdata en de stuitingsbrieven nalopen.
+    feitencheck:
+      - "Opeisbaarheidsdatum van elke deelvordering"
+      - "Alle stuitingsbrieven met verzenddatum en bewijs van ontvangst"
+
+  algemene_voorwaarden:
+    label: "Algemene voorwaarden niet ter hand gesteld / onredelijk beding"
+    prior: 0.40
+    escalatie: true
+    kern: >-
+      Een beding uit algemene voorwaarden kan vernietigbaar zijn als de wederpartij
+      geen redelijke mogelijkheid heeft gehad er kennis van te nemen. Dat raakt vooral
+      bedingen over incassokosten en rente, meestal niet de hoofdvordering zelf.
+    instructie: >-
+      Bij consumenten wordt hier streng naar gekeken, ook ambtshalve door de rechter.
+      Laat een jurist beoordelen hoe en wanneer de voorwaarden zijn verstrekt.
+    feitencheck:
+      - "Hoe en wanneer zijn de voorwaarden verstrekt of aangeboden?"
+      - "Is de wederpartij consument of bedrijf?"
+
+  hoogte_rente_en_incassokosten:
+    label: "Bedrag, rente of incassokosten kloppen niet"
+    prior: 0.45
+    escalatie: false
+    kern: >-
+      Voor consumenten gelden dwingende regels voor de aanmaning met een
+      betalingstermijn van veertien dagen en voor de maximale incassovergoeding. Wij
+      controleren of die correct zijn toegepast.
+    instructie: >-
+      Vaak deels terecht. Reken de post opnieuw door in plaats van hem te verdedigen.
+    feitencheck:
+      - "Is de veertiendagenbrief correct verzonden en met de juiste termijn?"
+      - "Herberekening rente per deelvordering"
+
+  ongerechtvaardigde_verrijking:
+    label: "Beroep op onverschuldigde betaling / ongerechtvaardigde verrijking"
+    prior: 0.15
+    escalatie: false
+    kern: >-
+      Slaagt zelden: aan de vordering ligt een rechtsgrond ten grondslag (wet en
+      overeenkomst), zodat van verrijking zonder redelijke grond geen sprake is.
+
+  awb_verwarring:
+    label: "Behandelt de vordering als bestuursrechtelijk bezwaar (Awb)"
+    prior: 0.05
+    escalatie: false
+    kern: >-
+      De netbeheerder is geen bestuursorgaan en een factuur is geen besluit. De
+      bezwaarprocedure, beslistermijnen en hoorplicht uit de Algemene wet bestuursrecht
+      gelden hier daarom niet. Het gaat om een civielrechtelijke vordering.
+    instructie: >-
+      Veelgemaakte fout in gegenereerde brieven. Leg het uit zonder de klant af te
+      serveren en behandel de brief gewoon inhoudelijk als betwisting.
+    feitencheck: []
+
+  pseudojuridisch:
+    label: "Pseudojuridische constructie (soevereine burger e.d.)"
+    prior: 0.02
+    escalatie: false
+    kern: >-
+      Het Nederlandse recht kent geen onderscheid tussen een 'levend mens' en een
+      administratieve entiteit, en bepalingen uit buitenlandse rechtsstelsels gelden
+      hier niet. De vordering berust op de wet en op de aansluit- en
+      transportovereenkomst.
+    instructie: >-
+      Antwoord kort, feitelijk en zonder spot. Ga niet mee in de terminologie van de
+      klant en verwijs naar de wel toepasselijke grondslag.
+    feitencheck: []
+
+  avg_privacy:
+    label: "AVG-bezwaar of verzoek om verwijdering van gegevens"
+    prior: 0.35
+    escalatie: true
+    kern: >-
+      Een AVG-verzoek kent een eigen wettelijke reactietermijn en een eigen route via de
+      functionaris gegevensbescherming. Behandel dit apart van de vordering; het schort
+      de betalingsverplichting niet op, maar mag ook niet blijven liggen.
+    feitencheck:
+      - "Is dit een inzage-, verwijderings- of bezwaarverzoek?"
+      - "Datum van ontvangst in verband met de reactietermijn"
+
+  dubbele_facturatie:
+    label: "Dubbele of onjuiste facturatie"
+    prior: 0.60
+    escalatie: false
+    kern: >-
+      Wij controleren de facturatie op dubbele of overlappende posten en corrigeren
+      wat onterecht in rekening is gebracht.
+    instructie: >-
+      Administratieve controle gaat voor op juridische argumentatie. Klopt de klacht,
+      corrigeer dan en zeg dat ook met zoveel woorden.
+    feitencheck:
+      - "Zijn er overlappende periodes of dubbele EAN-registraties?"
+
+  schrijnende_omstandigheden:
+    label: "Persoonlijke/medische omstandigheden, schuldhulp, overlijden"
+    prior: 0.50
+    escalatie: true
+    kern: >-
+      Wij kijken naar uw persoonlijke situatie en naar de mogelijkheden voor een
+      betalingsregeling.
+    instructie: >-
+      Geen juridische maar een menselijke afweging. Nooit automatisch beantwoorden:
+      dit gaat naar een medewerker voor een betalingsregeling of coulancetraject.
+    feitencheck: []
+
+  reeds_leverancier_gevonden:
+    label: "Ik heb inmiddels wél een leverancier"
+    prior: 0.65
+    escalatie: false
+    kern: >-
+      Vanaf de ingangsdatum van uw nieuwe leveringsovereenkomst vervalt de vordering.
+      De periode daarvóór blijft in beginsel staan.
+    instructie: >-
+      Bevestig de einddatum expliciet in de brief; daar ontstaat anders opnieuw discussie.
+    feitencheck:
+      - "Ingangsdatum leveringsovereenkomst en de bijbehorende marktmelding"
+
+  overig:
+    label: "Overig / niet in te delen"
+    prior: 0.40
+    escalatie: true
+    kern: >-
+      Wij bekijken uw bezwaar en berichten u hierover.
+    instructie: >-
+      Niet in te delen bezwaren gaan naar een mens. Verzin hier geen antwoord.
+
+# Signalen die altijd tot escalatie leiden, ongeacht de inhoudelijke beoordeling.
+escalatie_signalen:
+  - sleutel: gemachtigde
+    label: "Advocaat, deurwaarder of rechtsbijstand betrokken"
+    patronen: ["advocaat", "gemachtigde", "rechtsbijstand", "raadsman", "raadsvrouw", "mr\\."]
+  - sleutel: procedure
+    label: "Verwijzing naar een lopende of aangekondigde procedure"
+    patronen: ["dagvaarding", "kantonrechter", "rechtbank", "kort geding", "conservatoir", "beslag"]
+  - sleutel: toezichthouder
+    label: "Toezichthouder of geschilleninstantie ingeschakeld"
+    patronen: ["\\bACM\\b", "geschillencommissie", "ombudsman", "autoriteit persoonsgegevens", "\\bAP\\b"]
+  - sleutel: avg
+    label: "AVG-verzoek met eigen wettelijke termijn"
+    patronen: ["\\bAVG\\b", "\\bGDPR\\b", "persoonsgegevens", "recht op inzage", "vergetelheid"]
+  - sleutel: kwetsbaarheid
+    label: "Schrijnende of medische omstandigheden"
+    patronen: ["overleden", "overlijden", "ziek", "medisch", "ziekenhuis", "schuldhulp", "bewind", "wsnp", "curator"]
+  - sleutel: insolventie
+    label: "Faillissement of insolventie"
+    patronen: ["faillissement", "failliet", "surseance", "wsnp"]
+  - sleutel: pers
+    label: "Dreiging met media of publiciteit"
+    patronen: ["pers\\b", "media", "journalist", "twitter", "sociale media"]
+  - sleutel: bedreiging
+    label: "Bedreigende of intimiderende inhoud"
+    patronen: ["aangifte tegen u", "persoonlijk aansprakelijk", "strafrechtelijk", "bedreig"]
+
+# Signalen dat een brief (deels) door een taalmodel is opgesteld.
+# Dit is een hulpmiddel voor triage, GEEN grond om een bezwaar af te wijzen.
+ai_signalen:
+  - sleutel: verzonnen_bron
+    gewicht: 0.45
+    label: "Verwijzing naar een bron die niet blijkt te bestaan"
+  - sleutel: niet_toepasselijk_recht
+    gewicht: 0.25
+    label: "Beroep op rechtsgebied dat hier niet geldt (Awb, buitenlands recht)"
+  - sleutel: generieke_opsomming
+    gewicht: 0.15
+    label: "Opsomming van standaardargumenten zonder feiten uit dit dossier"
+  - sleutel: geen_dossiergegevens
+    gewicht: 0.15
+    label: "Geen EAN, adres, datum of bedrag genoemd"

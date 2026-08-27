@@ -1,0 +1,32 @@
+{% extends "basis.html" %}
+{% block inhoud %}
+<h2 style="margin-top:0">Werkvoorraad ({{ bezwaren|length }})</h2>
+
+<form method="post" action="/ui/tekst" class="paneel" style="margin-bottom:22px">
+  <h2>Bezwaar plakken</h2>
+  <textarea name="tekst" placeholder="Plak hier de volledige brieftekst..." required></textarea>
+  <p style="margin:10px 0 0"><button type="submit">Analyseren</button>
+    <span class="gedempt">of gebruik <code>POST /api/bezwaren/upload</code> voor een PDF</span></p>
+</form>
+
+{% if not bezwaren %}
+  <p class="gedempt">Nog geen bezwaren. Plak er een hierboven, upload een PDF of haal de postbus op.</p>
+{% else %}
+<table>
+  <tr><th>#</th><th>Afzender</th><th>Kenmerk</th><th>Status</th><th>Kans</th>
+      <th>Escalatie</th><th>AI-signaal</th><th>Ontvangen</th></tr>
+  {% for b in bezwaren %}
+  <tr>
+    <td><a href="/bezwaar/{{ b.id }}">{{ b.id }}</a></td>
+    <td>{{ b.afzender_naam or "—" }}</td>
+    <td>{{ b.dossier_ref or b.ean or "—" }}</td>
+    <td>{{ b.status.value }}</td>
+    <td><span class="vlag {{ b.globale_kans.value }}">{{ b.globale_kans.value }}</span></td>
+    <td>{% if b.escalatie %}<span class="vlag blokkerend">naar mens</span>{% else %}—{% endif %}</td>
+    <td>{{ "%.0f%%"|format((b.ai_gegenereerd_signaal or 0) * 100) }}</td>
+    <td class="gedempt">{{ b.ontvangen_op.strftime("%d-%m-%Y %H:%M") }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+{% endblock %}

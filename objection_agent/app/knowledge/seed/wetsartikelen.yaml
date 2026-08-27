@@ -1,0 +1,251 @@
+# Wettelijke grondslagen per bezwaarcategorie.
+#
+# LET OP: alles hieronder komt binnen als `ongeverifieerd`. De synchronisatie
+# (`python -m app.knowledge.sync wetten`) haalt de echte tekst op bij het
+# officiele KOOP-repository en zet de status pas dan op `bevestigd`. Artikelen
+# die daar niet gevonden worden, komen op `niet_gevonden` te staan en worden
+# NOOIT in een conceptbrief geciteerd. Dat is de vangnetconstructie tegen
+# verzonnen vindplaatsen - ook tegen die van deze agent zelf.
+
+versie: "2026-08-1"
+
+wetten:
+  - bwb_id: BWBR0005291
+    naam: "Burgerlijk Wetboek Boek 3"
+    afkorting: BW3
+  - bwb_id: BWBR0005289
+    naam: "Burgerlijk Wetboek Boek 6"
+    afkorting: BW6
+  - bwb_id: BWBR0005288
+    naam: "Burgerlijk Wetboek Boek 5"
+    afkorting: BW5
+  - bwb_id: BWBR0009755
+    naam: "Elektriciteitswet 1998"
+    afkorting: E-wet
+    geldig_tot: "2025-12-31"
+    vervangen_door: energiewet
+    notitie: >-
+      Vervallen per invoering van de Energiewet. Blijft nodig voor vorderingen
+      over periodes vóór die datum; controleer de exacte vervaldatum bij de bron.
+  - bwb_id: BWBR0011440
+    naam: "Gaswet"
+    afkorting: Gaswet
+    geldig_tot: "2025-12-31"
+    vervangen_door: energiewet
+  - bwb_id: null
+    naam: "Energiewet"
+    afkorting: Ew
+    geldig_vanaf: "2026-01-01"
+    notitie: >-
+      BWB-id nog invullen. Draai `python -m app.knowledge.sync resolve-bwb "Energiewet"`
+      op een omgeving met internettoegang, of vul het handmatig in. Zolang het id
+      ontbreekt blijven alle Energiewet-artikelen ongeverifieerd en dus onciteerbaar.
+
+artikelen:
+  # --- Overeenkomst en wilsvertrouwen ---------------------------------
+  - key: bw3-33
+    wet: BW3
+    artikel: "3:33"
+    vindplaats: "art. 3:33 BW"
+    onderwerp: "Rechtshandeling vereist een op rechtsgevolg gerichte wil"
+    categorieen: [geen_ondertekend_contract]
+  - key: bw3-35
+    wet: BW3
+    artikel: "3:35"
+    vindplaats: "art. 3:35 BW"
+    onderwerp: >-
+      Bescherming van gerechtvaardigd vertrouwen: wie op grond van een verklaring
+      of gedraging redelijkerwijs een overeenkomst mocht aannemen, kan zich daarop
+      beroepen. Dragende bepaling tegen 'ik heb niets getekend'.
+    categorieen: [geen_ondertekend_contract, pseudojuridisch]
+  - key: bw6-217
+    wet: BW6
+    artikel: "6:217"
+    vindplaats: "art. 6:217 BW"
+    onderwerp: >-
+      Een overeenkomst komt tot stand door aanbod en aanvaarding. De wet stelt geen
+      vormvereiste; aanvaarding kan ook in gedragingen besloten liggen.
+    categorieen: [geen_ondertekend_contract, geen_verbruik]
+  - key: bw3-37
+    wet: BW3
+    artikel: "3:37"
+    vindplaats: "art. 3:37 BW"
+    onderwerp: "Verklaringen kunnen in iedere vorm geschieden, ook in gedragingen"
+    categorieen: [geen_ondertekend_contract]
+  - key: bw6-248
+    wet: BW6
+    artikel: "6:248"
+    vindplaats: "art. 6:248 BW"
+    onderwerp: "Aanvullende en beperkende werking van redelijkheid en billijkheid"
+    categorieen: [algemene_voorwaarden, schrijnende_omstandigheden]
+
+  # --- Verjaring en stuiting ------------------------------------------
+  - key: bw3-307
+    wet: BW3
+    artikel: "3:307"
+    vindplaats: "art. 3:307 BW"
+    onderwerp: "Verjaring van een rechtsvordering tot nakoming van een verbintenis uit overeenkomst"
+    categorieen: [verjaring]
+  - key: bw3-308
+    wet: BW3
+    artikel: "3:308"
+    vindplaats: "art. 3:308 BW"
+    onderwerp: >-
+      Verjaring van vorderingen tot betaling van periodiek verschuldigde bedragen.
+      Relevant voor vastrecht en periodieke aansluitvergoeding.
+    categorieen: [verjaring]
+  - key: bw3-317
+    wet: BW3
+    artikel: "3:317"
+    vindplaats: "art. 3:317 BW"
+    onderwerp: "Stuiting van de verjaring door een schriftelijke aanmaning of mededeling"
+    categorieen: [verjaring]
+  - key: bw3-319
+    wet: BW3
+    artikel: "3:319"
+    vindplaats: "art. 3:319 BW"
+    onderwerp: "Nieuwe verjaringstermijn na stuiting"
+    categorieen: [verjaring]
+
+  # --- Algemene voorwaarden -------------------------------------------
+  - key: bw6-231
+    wet: BW6
+    artikel: "6:231"
+    vindplaats: "art. 6:231 BW"
+    onderwerp: "Definities algemene voorwaarden"
+    categorieen: [algemene_voorwaarden]
+  - key: bw6-233
+    wet: BW6
+    artikel: "6:233"
+    vindplaats: "art. 6:233 BW"
+    onderwerp: >-
+      Vernietigbaarheid van een beding dat onredelijk bezwarend is, of wanneer geen
+      redelijke mogelijkheid tot kennisneming is geboden.
+    categorieen: [algemene_voorwaarden]
+  - key: bw6-234
+    wet: BW6
+    artikel: "6:234"
+    vindplaats: "art. 6:234 BW"
+    onderwerp: "Wijze waarop een redelijke mogelijkheid tot kennisneming wordt geboden"
+    categorieen: [algemene_voorwaarden]
+
+  # --- Geld, rente, incassokosten -------------------------------------
+  - key: bw6-119
+    wet: BW6
+    artikel: "6:119"
+    vindplaats: "art. 6:119 BW"
+    onderwerp: "Wettelijke rente bij vertraging in de voldoening van een geldsom"
+    categorieen: [hoogte_rente_en_incassokosten]
+  - key: bw6-119a
+    wet: BW6
+    artikel: "6:119a"
+    vindplaats: "art. 6:119a BW"
+    onderwerp: "Wettelijke handelsrente bij handelsovereenkomsten"
+    categorieen: [hoogte_rente_en_incassokosten]
+  - key: bw6-96
+    wet: BW6
+    artikel: "6:96"
+    vindplaats: "art. 6:96 BW"
+    onderwerp: >-
+      Vermogensschade en buitengerechtelijke incassokosten. Lid 6 bevat de
+      veertiendagenbrief bij consumenten; hier gaat het bij betwisting vaak mis.
+    categorieen: [hoogte_rente_en_incassokosten, algemene_voorwaarden]
+
+  # --- Verrijking en onverschuldigde betaling -------------------------
+  - key: bw6-203
+    wet: BW6
+    artikel: "6:203"
+    vindplaats: "art. 6:203 BW"
+    onderwerp: "Onverschuldigde betaling"
+    categorieen: [ongerechtvaardigde_verrijking]
+  - key: bw6-212
+    wet: BW6
+    artikel: "6:212"
+    vindplaats: "art. 6:212 BW"
+    onderwerp: >-
+      Ongerechtvaardigde verrijking. Vereist verrijking 'zonder redelijke grond';
+      een wettelijke taak en een overeenkomst vormen juist zo'n grond.
+    categorieen: [ongerechtvaardigde_verrijking]
+  - key: bw6-74
+    wet: BW6
+    artikel: "6:74"
+    vindplaats: "art. 6:74 BW"
+    onderwerp: "Tekortkoming in de nakoming"
+    categorieen: [hoogte_rente_en_incassokosten]
+
+  # --- Eigendom van netten --------------------------------------------
+  - key: bw5-20
+    wet: BW5
+    artikel: "5:20"
+    vindplaats: "art. 5:20 BW"
+    onderwerp: >-
+      Eigendom van de grond en de uitzondering voor netten: de bevoegde aanlegger is
+      eigenaar van het net. Relevant bij 'de kabel ligt op mijn grond dus is van mij'.
+    categorieen: [feitelijke_aansluiting_betwist, pseudojuridisch]
+
+  # --- Energierecht: aansluit- en transporttaak -----------------------
+  # Deze verwijzingen staan bewust op artikelniveau leeg tot de synchronisatie
+  # de Energiewet heeft opgehaald. Vul `artikel` in zodra het BWB-id bekend is.
+  - key: ew-aansluittaak
+    wet: Ew
+    artikel: null
+    vindplaats: "Energiewet, aansluittaak netbeheerder"
+    onderwerp: >-
+      Wettelijke taak van de netbeheerder om aangeslotenen aan te sluiten en te voorzien
+      van transport. Grondslag voor de vordering die niet afhangt van een handtekening.
+    categorieen: [geen_ondertekend_contract, geen_verbruik, feitelijke_aansluiting_betwist]
+    te_verifieren: true
+  - key: ew-tariefstructuur
+    wet: Ew
+    artikel: null
+    vindplaats: "Energiewet, tarieven en tariefstructuren"
+    onderwerp: >-
+      Door de ACM vastgestelde tarieven voor aansluiting en transport, die de
+      netbeheerder verplicht in rekening brengt. Onderbouwt dat het tarief niet
+      onderhandelbaar en niet verbruiksafhankelijk is.
+    categorieen: [geen_verbruik, hoogte_rente_en_incassokosten, leegstand_of_sloop]
+    te_verifieren: true
+  - key: ew-leveringsovereenkomst
+    wet: Ew
+    artikel: null
+    vindplaats: "Energiewet, verplichting tot een leveringsovereenkomst"
+    onderwerp: >-
+      Grondslag voor de eis dat een aangeslotene een leveringsovereenkomst heeft.
+      Dit is het hart van het ASC-dossier; laat een jurist de exacte artikelen
+      bevestigen voordat de agent hiernaar verwijst.
+    categorieen: [geen_ondertekend_contract, reeds_leverancier_gevonden]
+    te_verifieren: true
+
+  # --- Bestuursrecht: juist om uit te leggen dat het NIET geldt -------
+  - key: awb-1-1
+    wet: null
+    artikel: "1:1"
+    vindplaats: "art. 1:1 Awb"
+    onderwerp: >-
+      Definitie van bestuursorgaan. Gebruikt om uit te leggen dat de netbeheerder dat
+      niet is en dat de Awb-bezwaarprocedure hier niet geldt.
+    categorieen: [awb_verwarring]
+    te_verifieren: true
+
+regelingen:
+  # Niet in het BWB te vinden: dit zijn ACM-codebesluiten en branchevoorwaarden.
+  # Aanleveren via de kennisbank-import (`POST /api/knowledge/sources`).
+  - key: atv-elektriciteit
+    titel: "Aansluit- en transportvoorwaarden Elektriciteit (ACM-codebesluit)"
+    categorieen: [geen_ondertekend_contract, geen_verbruik, leegstand_of_sloop]
+    url: "https://www.acm.nl/nl/onderwerpen/energie/energiebedrijven/codes-energie"
+    aanleveren_door: "afdeling ASC"
+  - key: atv-gas
+    titel: "Aansluit- en transportvoorwaarden Gas (ACM-codebesluit)"
+    categorieen: [geen_ondertekend_contract, geen_verbruik, leegstand_of_sloop]
+    url: "https://www.acm.nl/nl/onderwerpen/energie/energiebedrijven/codes-energie"
+    aanleveren_door: "afdeling ASC"
+  - key: tarievencode
+    titel: "Tarievencode Elektriciteit / Gas"
+    categorieen: [geen_verbruik, hoogte_rente_en_incassokosten]
+    aanleveren_door: "afdeling ASC"
+  - key: afsluitbeleid-kleinverbruikers
+    titel: "Regeling afsluitbeleid voor kleinverbruikers van elektriciteit, gas en warmte"
+    categorieen: [schrijnende_omstandigheden, awb_verwarring]
+    aanleveren_door: "afdeling ASC"
+    te_verifieren: true

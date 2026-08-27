@@ -1,0 +1,119 @@
+{% extends "basis.html" %}
+{% block inhoud %}
+<p><a href="/">&larr; Werkvoorraad</a></p>
+<h2 style="margin-top:0">Bezwaar {{ b.id }}
+  <span class="vlag {{ b.globale_kans.value }}">{{ b.globale_kans.value }}</span>
+</h2>
+<p class="gedempt">
+  {{ b.afzender_naam or "onbekende afzender" }} ·
+  {{ b.dossier_ref or b.ean or "geen kenmerk" }} ·
+  binnengekomen via {{ b.kanaal }} ·
+  tekstkwaliteit: {{ b.tekst_kwaliteit }}
+</p>
+
+{% if b.escalatie %}
+<div class="melding blokkerend">
+  <strong>Dit dossier gaat naar een medewerker met juridische kennis</strong>
+  {{ b.escalatie_reden }}
+</div>
+{% endif %}
+
+{% if b.ai_gegenereerd_signaal and b.ai_gegenereerd_signaal > 0.3 %}
+<div class="melding waarschuwing">
+  <strong>Signaal geautomatiseerd opgestelde brief: {{ "%.0f%%"|format(b.ai_gegenereerd_signaal * 100) }}</strong>
+  {{ b.ai_signaal_toelichting }}
+  <p class="gedempt" style="margin:6px 0 0">Alleen triage-informatie. Dit is geen grond om het
+  bezwaar af te wijzen — beoordeel de argumenten op inhoud.</p>
+</div>
+{% endif %}
+
+<div class="kolommen">
+  <div class="paneel">
+    <h2>Brief van de klant</h2>
+    <div class="brief"><pre>{{ b.ruwe_tekst }}</pre></div>
+
+    <h2 style="margin-top:22px">Argumenten ({{ b.argumenten|length }})</h2>
+    {% for a in b.argumenten %}
+    <div class="argument">
+      <strong>{{ a.volgnummer }}. {{ a.stelling }}</strong>
+      <span class="vlag {{ a.merit.value }}">{{ a.merit.value }} · {{ "%.2f"|format(a.merit_score) }}</span>
+      <div class="gedempt">categorie: {{ a.categorie }}</div>
+      {% if a.citaat %}<blockquote>{{ a.citaat }}</blockquote>{% endif %}
+      <p style="margin:6px 0 0">{{ a.onderbouwing }}</p>
+      {% if a.benodigde_feitencheck %}
+      <p class="gedempt" style="margin:6px 0 0">Nog te controleren:</p>
+      <ul class="gedempt" style="margin:2px 0 0">
+        {% for f in a.benodigde_feitencheck %}<li>{{ f }}</li>{% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+    {% endfor %}
+
+    {% if b.aangehaalde_bronnen %}
+    <h2 style="margin-top:22px">Door de klant aangehaalde bronnen</h2>
+    <table>
+      {% for c in b.aangehaalde_bronnen %}
+      <tr>
+        <td><code>{{ c.ruwe_verwijzing }}</code></td>
+        <td>
+          <span class="vlag {{ 'blokkerend' if c.uitkomst in ('bestaat_niet','niet_van_toepassing','ingetrokken') else 'kansarm' }}">
+            {{ c.uitkomst }}</span>
+          <div class="gedempt">{{ c.toelichting }}</div>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+  </div>
+
+  <div class="paneel">
+    <h2>Conceptantwoord</h2>
+    {% if not concept %}
+      <p class="gedempt">Nog geen concept.</p>
+      <form method="post" action="/ui/bezwaar/{{ b.id }}/verwerk">
+        <button type="submit">Nu verwerken</button>
+      </form>
+    {% else %}
+      <p class="gedempt">
+        versie {{ concept.versie }} · {{ concept.model or "onbekend model" }} ·
+        {{ concept.created_at.strftime("%d-%m-%Y %H:%M") }}
+      </p>
+
+      {% for bev in (concept.guardrail_rapport or {}).get("bevindingen", []) %}
+      <div class="melding {{ bev.ernst }}">
+        <strong>{{ bev.boodschap }}</strong>
+        <span class="gedempt">{{ bev.code }}</span>
+        {% if bev.details %}<ul>{% for d in bev.details %}<li>{{ d }}</li>{% endfor %}</ul>{% endif %}
+      </div>
+      {% endfor %}
+
+      {% if concept.geblokkeerd %}
+      <div class="melding blokkerend">
+        <strong>Tegengehouden</strong>
+        Dit concept kan niet ongewijzigd worden goedgekeurd. Pas de tekst hieronder aan.
+      </div>
+      {% endif %}
+
+      <form method="post" action="/ui/bezwaar/{{ b.id }}/concept/{{ concept.id }}/goedkeuren">
+        <textarea name="tekst" style="min-height:420px">{{ concept.tekst }}</textarea>
+        <p style="margin:10px 0 0">
+          <input type="text" name="beoordelaar" placeholder="Uw naam" required>
+          <input type="text" name="notitie" placeholder="Notitie (optioneel)" style="width:40%">
+          <button type="submit">Goedkeuren</button>
+        </p>
+        <p class="gedempt">Goedkeuren legt de tekst vast met uw naam en tijdstip. Verzenden doet
+          u zelf; dit systeem verstuurt niets.</p>
+      </form>
+
+      <form method="post" action="/ui/bezwaar/{{ b.id }}/verwerk" style="margin-top:10px">
+        <button type="submit" class="secundair">Opnieuw laten genereren</button>
+      </form>
+
+      {% if concept.goedgekeurd_op %}
+      <p class="melding kansrijk"><strong>Goedgekeurd</strong>
+        door {{ concept.beoordelaar }} op {{ concept.goedgekeurd_op.strftime("%d-%m-%Y %H:%M") }}</p>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

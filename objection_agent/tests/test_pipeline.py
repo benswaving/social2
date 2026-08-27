@@ -1,0 +1,122 @@
+"""Volledige verwerking van een bezwaar, zonder taalmodel (regels en sjabloon)."""
+
+from datetime import date
+
+from app.agent.pipeline import verwerk_bezwaar
+from app.agent.verify import BESTAAT_NIET, NIET_VAN_TOEPASSING, controleer_verwijzingen
+from app.ingest.intake import uit_tekst
+from app.models import CaseStatus, Merit, Source, SourceKind, Verification
+
+
+def _verwerk(session, tekst):
+    objection = uit_tekst(session, tekst)
+    draft = verwerk_bezwaar(session, objection, online=False)
+    session.refresh(objection)
+    return objection, draft
+
+
+def test_pseudojuridische_brief_wordt_ingedeeld_en_geescaleerd(session, fixtures_dir):
+    tekst = (fixtures_dir / "pseudojuridisch.txt").read_text(encoding="utf-8")
+    objection, draft = _verwerk(session, tekst)
+
+    categorieen = {a.categorie for a in objection.argumenten}
+    assert "geen_ondertekend_contract" in categorieen
+    assert "pseudojuridisch" in categorieen
+    assert "awb_verwarring" in categorieen
+    assert "leegstand_of_sloop" in categorieen
+
+    # De brief noemt de Awb: dat is hier geen toepasselijk recht.
+    uitkomsten = {c.ruwe_verwijzing: c.uitkomst for c in objection.aangehaalde_bronnen}
+    assert any(u == NIET_VAN_TOEPASSING for u in uitkomsten.values())
+
+    assert draft.tekst.strip()
+    assert objection.status in (CaseStatus.CONCEPT_GEREED, CaseStatus.GEESCALEERD)
+
+
+def test_terecht_bezwaar_wordt_als_kansrijk_gemarkeerd(session, fixtures_dir):
+    tekst = (fixtures_dir / "terecht_bezwaar.txt").read_text(encoding="utf-8")
+    objection, draft = _verwerk(session, tekst)
+
+    assert "verkeerde_partij" in {a.categorie for a in objection.argumenten}
+    assert objection.globale_kans == Merit.KANSRIJK
+    assert objection.escalatie is True
+    # Bij een kansrijk bezwaar mag de brief geen afwijzing bevatten maar een toezegging.
+    assert "onderzoeken" in draft.tekst.lower()
+
+
+def test_verzonnen_ecli_verhoogt_het_ai_signaal(session):
+    # Zo staat een gecontroleerde, niet-bestaande uitspraak in de kennisbank nadat
+    # `sync ecli` hem heeft opgezocht.
+    session.add(
+        Source(
+            key="ecli-nl-hr-2019-1423",
+            soort=SourceKind.JURISPRUDENTIE,
+            titel="Niet gevonden",
+            vindplaats="ECLI:NL:HR:2019:1423",
+            verificatie=Verification.NIET_GEVONDEN,
+        )
+    )
+    session.commit()
+
+    oordelen = controleer_verwijzingen(
+        session, "Zie ECLI:NL:HR:2019:1423 waaruit blijkt dat ik gelijk heb.", online=False
+    )
+    assert oordelen[0].uitkomst == BESTAAT_NIET
+
+    objection, _ = _verwerk(
+        session, "Ik heb nooit een contract getekend. Zie ECLI:NL:HR:2019:1423 en verder niets."
+    )
+    assert objection.ai_gegenereerd_signaal >= 0.45
+    assert "bestaan niet" in (objection.ai_signaal_toelichting or "")
+
+
+def test_ongecontroleerde_verwijzing_blijft_onbekend(session):
+    """Zonder controle bij de bron beweren we nooit dat iets niet bestaat."""
+    oordelen = controleer_verwijzingen(session, "Zie ECLI:NL:HR:2099:1.", online=False)
+    assert oordelen[0].uitkomst == "onbekend"
+
+
+def test_concept_citeert_alleen_geverifieerde_bronnen(session, fixtures_dir):
+    tekst = (fixtures_dir / "pseudojuridisch.txt").read_text(encoding="utf-8")
+    _, draft = _verwerk(session, tekst)
+
+    # De seed staat op `ongeverifieerd`, dus er is niets citeerbaars: het concept
+    # mag dan geen enkele vindplaats noemen.
+    rapport = draft.guardrail_rapport or {}
+    codes = {b["code"] for b in rapport.get("bevindingen", [])}
+    assert "vindplaats_buiten_kennisbank" not in codes
+
+
+def test_geverifieerde_bron_komt_wel_beschikbaar(session):
+    bron = session.query(Source).filter_by(key="bw6-217").one()
+    bron.verificatie = Verification.BEVESTIGD
+    bron.tekst = "Een overeenkomst komt tot stand door een aanbod en de aanvaarding daarvan."
+    session.commit()
+
+    _, draft = _verwerk(session, "Ik heb nooit een contract getekend met u.")
+    assert "bw6-217" in (draft.gebruikte_bron_keys or [])
+
+
+def test_lege_brief_levert_een_nette_fout(session):
+    from app.models import Objection
+
+    objection = Objection(kanaal="api", bron_id="leeg", ruwe_tekst="   ")
+    session.add(objection)
+    session.commit()
+
+    try:
+        verwerk_bezwaar(session, objection, online=False)
+    except ValueError as exc:
+        assert "Geen tekst" in str(exc)
+    else:
+        raise AssertionError("verwachtte een ValueError")
+
+    session.refresh(objection)
+    assert objection.status == CaseStatus.MISLUKT
+
+
+def test_peildatum_bepaalt_welk_recht_geldt(session):
+    from app.agent.analyse import analyseer_met_regels
+
+    analyse = analyseer_met_regels("De vordering ziet op de periode vanaf 12-03-2022.")
+    assert analyse.peildatum == date(2022, 3, 12)

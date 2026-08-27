@@ -1,0 +1,100 @@
+# Trefwoorden voor de offline modus en als extra signaal naast het model.
+#
+# Deze regels vervangen het taalmodel niet: ze zorgen dat een dossier ook
+# behandeld wordt als er geen LLM beschikbaar is, en ze vangen categorieen op
+# die een model soms mist. De uitkomst is grover; dat staat ook zo in de
+# review-UI ("regelmatig ingedeeld, niet door het model").
+
+geen_ondertekend_contract:
+  - "nooit een contract"
+  - "niets getekend"
+  - "geen handtekening"
+  - "geen overeenkomst gesloten"
+  - "nooit ondertekend"
+  - "geen contract met u"
+feitelijke_aansluiting_betwist:
+  - "geen aansluiting"
+  - "niet aangesloten"
+  - "geen meter"
+  - "meter is verwijderd"
+geen_verbruik:
+  - "geen verbruik"
+  - "niets afgenomen"
+  - "nul verbruik"
+  - "geen energie gebruikt"
+  - "meterstand staat stil"
+leegstand_of_sloop:
+  - "staat leeg"
+  - "leegstand"
+  - "gesloopt"
+  - "gesloopte"
+  - "onbewoond"
+verkeerde_partij:
+  - "niet de eigenaar"
+  - "verkocht"
+  - "overgedragen"
+  - "notaris"
+  - "kadaster"
+  - "ik ben huurder"
+  - "verhuurder"
+  - "verhuisd"
+verjaring:
+  - "verjaard"
+  - "verjaring"
+  - "vijf jaar"
+  - "stuiting"
+algemene_voorwaarden:
+  - "algemene voorwaarden"
+  - "niet ter hand gesteld"
+  - "onredelijk bezwarend"
+  - "vernietig"
+hoogte_rente_en_incassokosten:
+  - "incassokosten"
+  - "rente"
+  - "aanmaningskosten"
+  - "veertiendagenbrief"
+  - "bedrag klopt niet"
+  - "te hoog"
+ongerechtvaardigde_verrijking:
+  - "ongerechtvaardigde verrijking"
+  - "onverschuldigd"
+awb_verwarring:
+  - "bezwaarschrift"
+  - "algemene wet bestuursrecht"
+  - "\\bawb\\b"
+  - "hoorzitting"
+  - "beslistermijn"
+  - "besluit intrekken"
+pseudojuridisch:
+  - "natuurlijk persoon"
+  - "soeverein"
+  - "strawman"
+  - "\\bucc\\b"
+  - "levend mens"
+  - "geen contract geen verplichting"
+  - "handelsrecht van de zee"
+  - "verdrag van"
+avg_privacy:
+  - "\\bavg\\b"
+  - "\\bgdpr\\b"
+  - "persoonsgegevens"
+  - "recht op inzage"
+  - "vergetelheid"
+  - "verwijder mijn gegevens"
+dubbele_facturatie:
+  - "twee keer"
+  - "dubbel gefactureerd"
+  - "al betaald"
+  - "reeds voldaan"
+schrijnende_omstandigheden:
+  - "overleden"
+  - "ziek"
+  - "ziekenhuis"
+  - "schuldhulp"
+  - "bewindvoerder"
+  - "kan niet betalen"
+reeds_leverancier_gevonden:
+  - "inmiddels een contract"
+  - "nieuwe leverancier"
+  - "wel een leverancier"
+  - "contract afgesloten bij"
